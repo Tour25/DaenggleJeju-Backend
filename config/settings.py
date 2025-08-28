@@ -33,6 +33,9 @@ SECRET_KEY = os.getenv("SECRET_KEY")
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
+KTO_PET_API_KEY = os.getenv("KTO_PET_API_KEY")
+KTO_BASE_URL = os.getenv("KTO_BASE_URL")
+
 ALLOWED_HOSTS = ["localhost", "0.0.0.0","127.0.0.1"]
 
 
@@ -46,8 +49,10 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'corsheaders',
+    'drf_yasg',
     'places',
-    'rest_framework'
+    'integrations',
+    'rest_framework',
 ]
 
 MIDDLEWARE = [
@@ -100,6 +105,17 @@ DATABASES = {
         "PASSWORD": os.getenv("MYSQL_PASSWORD"),
         "HOST": os.getenv("MYSQL_HOST"),
         "PORT": os.getenv("MYSQL_PORT"),
+    }
+}
+
+SWAGGER_SETTINGS = {
+    'USE_SESSION_AUTH': False,
+    'SECURITY_DEFINITIONS': {
+        'Bearer': {
+            'type': 'apiKey',
+            'name': 'Authorization',
+            'in': 'header'
+        }
     }
 }
 
