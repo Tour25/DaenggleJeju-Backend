@@ -43,9 +43,22 @@ class Place(TimeStamped):
     tel = models.CharField(max_length=100, blank=True, null=True)
     homepage = models.URLField(blank=True, null=True)
 
-    meta_common = models.JSONField(default=dict)  # detailCommon 원문
-    meta_intro = models.JSONField(default=dict)   # detailIntro 원문
-    meta_info = models.JSONField(default=dict)    # detailInfo 원문
+    has_parking = models.BooleanField(null=True, blank=True)
+    parking_note = models.CharField(max_length=300, null=True, blank=True)
+
+    usetime = models.CharField(max_length=300, blank=True, null=True)
+    restdate = models.CharField(max_length=200, blank=True, null=True)
+    opendate = models.CharField(max_length=200, blank=True, null=True)
+    useseason = models.CharField(max_length=200, blank=True, null=True)
+    accomcount = models.CharField(max_length=100, blank=True, null=True)
+    expagerange = models.CharField(max_length=100, blank=True, null=True)
+    expguide = models.TextField(blank=True, null=True)
+    chkcreditcard = models.CharField(max_length=50, blank=True, null=True)
+    accepts_card = models.BooleanField(null=True, blank=True)
+
+    meta_common = models.JSONField(default=dict)
+    meta_intro = models.JSONField(default=dict)
+    meta_info = models.JSONField(default=dict)
 
     def __str__(self):
         return f"[{self.content_type_id}] {self.title} ({self.content_id})"

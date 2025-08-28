@@ -4,36 +4,41 @@ from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
 
 from .client import KTOClient, items_as_list
-from .serializers import (
-    AreaBasedListQuery,
-    LocationBasedListQuery,
-    SearchKeywordQuery,
-    PetTourSyncQuery,
-    BootstrapAreaBody,
-    EnrichIdsBody,
-)
-from .sync import (
-    sync_area_and_sigungu,
-    sync_category,
-    upsert_place_from_list,
-    enrich_detail,
-    run_incremental,
-    run_bootstrap_area,
-)
+from .serializers import (AreaBasedListQuery,LocationBasedListQuery,SearchKeywordQuery,PetTourSyncQuery,EnrichIdsBody,)
+from .sync import (sync_area_and_sigungu, sync_category,upsert_place_from_list,enrich_detail,run_incremental,run_bootstrap_area,)
+from places.models import AreaCode
 
 cli = KTOClient()
 
 class AreaCodeView(APIView):
-    @swagger_auto_schema(operation_summary="지역 코드 목록 동기화", tags=["KTO"])
+    @swagger_auto_schema(operation_summary="지역 코드 동기화 (제주 39만)", tags=["KTO"])
     def post(self, request):
-        sync_area_and_sigungu(cli)
-        return Response({"status": "ok"})
+
+        try:
+            areas = items_as_list(cli.get("areaCode", pageNo=1, numOfRows=100))
+            jeju_name = next((a.get("name") for a in areas if a.get("code") == "39"), "제주")
+        except Exception:
+            jeju_name = "제주"
+
+
+        AreaCode.objects.update_or_create(
+            area_code="39", sigungu_code=None, defaults={"name": jeju_name}
+        )
+
+
+        sub = cli.get("areaCode", areaCode="39", pageNo=1, numOfRows=200)
+        for s in items_as_list(sub):
+            AreaCode.objects.update_or_create(
+                area_code="39", sigungu_code=s.get("code"), defaults={"name": s.get("name")}
+            )
+        return Response({"status": "ok", "areaCode": "39"})
 
 class CategoryCodeView(APIView):
     @swagger_auto_schema(operation_summary="카테고리 코드 동기화", tags=["KTO"])
     def post(self, request):
         sync_category(cli)
         return Response({"status": "ok"})
+
 
 class AreaBasedListView(APIView):
     @swagger_auto_schema(operation_summary="지역기반 목록 조회", tags=["KTO"], query_serializer=AreaBasedListQuery)
@@ -58,7 +63,7 @@ class SearchKeywordView(APIView):
 
 class DetailPreviewView(APIView):
     @swagger_auto_schema(
-        operation_summary="상세 5종 미리보기",
+        operation_summary="상세 미리보기",
         tags=["KTO"],
         manual_parameters=[
             openapi.Parameter("contentId", openapi.IN_QUERY, type=openapi.TYPE_INTEGER, required=True),
@@ -70,8 +75,7 @@ class DetailPreviewView(APIView):
         if not cid_q:
             return Response({"detail": "contentId required"}, status=400)
         cid = int(cid_q)
-        ctid_q = request.query_params.get("contentTypeId")
-        ctid = int(ctid_q) if ctid_q else None
+        ctid = int(request.query_params.get("contentTypeId")) if request.query_params.get("contentTypeId") else None
 
         common = cli.get("detailCommon", contentId=cid, defaultYN="Y", addrinfoYN="Y", mapinfoYN="Y", overviewYN="Y")
         common_item = (common.get("items", {}) or {}).get("item")
@@ -86,6 +90,7 @@ class DetailPreviewView(APIView):
         image = cli.get("detailImage", contentId=cid, numOfRows=50, pageNo=1)
         pet   = cli.get("detailPetTour", contentId=cid)
         return Response({"common": common, "intro": intro, "info": info, "image": image, "pet": pet})
+
 
 class DailySyncView(APIView):
     @swagger_auto_schema(operation_summary="증분 동기화 실행 (일괄 저장)", tags=["KTO"], request_body=PetTourSyncQuery)
@@ -107,12 +112,20 @@ class DailySyncView(APIView):
         return Response({"dry_run": False, "processed": processed})
 
 class BootstrapAreaView(APIView):
-    @swagger_auto_schema(operation_summary="부트스트랩: 지역/시군구 전체 수집 + 상세 저장", tags=["KTO"], request_body=BootstrapAreaBody)
+    @swagger_auto_schema(
+        operation_summary="제주 지역/시군구 전체 수집 + 상세 저장",
+        tags=["KTO"]
+    )
     def post(self, request):
-        ser = BootstrapAreaBody(data=request.data); ser.is_valid(raise_exception=True)
-        p = ser.validated_data
-        done = run_bootstrap_area(cli, p["areaCode"], p.get("sigunguCode") or "", p["numOfRows"], p["max_pages"])
-        return Response({"processed": done})
+
+        done = run_bootstrap_area(
+            cli,
+            area_code="39",
+            sigungu_code="",
+            num_rows=100,   # 필요시 조정
+            max_pages=999,  # 필요시 조정
+        )
+        return Response({"processed": done, "areaCode": "39"})
 
 class EnrichIdsView(APIView):
     @swagger_auto_schema(operation_summary="특정 contentId 배열 상세 병합 저장", tags=["KTO"], request_body=EnrichIdsBody)
