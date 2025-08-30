@@ -36,6 +36,10 @@ DEBUG = True
 KTO_PET_API_KEY = os.getenv("KTO_PET_API_KEY")
 KTO_BASE_URL = os.getenv("KTO_BASE_URL")
 
+YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY")
+YOUTUBE_REGION_CODE = os.getenv("YOUTUBE_REGION_CODE", "KR")
+YOUTUBE_RELEVANCE_LANG = os.getenv("YOUTUBE_RELEVANCE_LANG", "ko")
+
 ALLOWED_HOSTS = ["localhost", "0.0.0.0","127.0.0.1"]
 
 
@@ -48,11 +52,12 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'rest_framework',
     'corsheaders',
     'drf_yasg',
     'places',
     'integrations',
-    'rest_framework',
+    'daenggle',
 ]
 
 MIDDLEWARE = [
@@ -99,12 +104,21 @@ WSGI_APPLICATION = 'config.wsgi.application'
 
 DATABASES = {
     "default": {
-        "ENGINE":'django.db.backends.mysql',
+        "ENGINE": "django.db.backends.mysql",
         "NAME": os.getenv("MYSQL_DATABASE"),
         "USER": os.getenv("MYSQL_USER"),
         "PASSWORD": os.getenv("MYSQL_PASSWORD"),
         "HOST": os.getenv("MYSQL_HOST"),
         "PORT": os.getenv("MYSQL_PORT"),
+        "OPTIONS": {
+            "charset": "utf8mb4",
+            "use_unicode": True,
+            "init_command": "SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci",
+        },
+        "TEST": {
+            "CHARSET": "utf8mb4",
+            "COLLATION": "utf8mb4_unicode_ci",
+        },
     }
 }
 

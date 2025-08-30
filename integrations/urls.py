@@ -6,4 +6,5 @@ app_name = "integrations"
 urlpatterns = [
 
     path("kto/", include(("integrations.kto.urls", "kto"), namespace="kto")),
+
 ]
