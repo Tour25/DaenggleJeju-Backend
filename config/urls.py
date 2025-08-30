@@ -31,5 +31,7 @@ schema_view = get_schema_view(
 
 urlpatterns = [
     path('swagger/', schema_view.with_ui('swagger', cache_timeout=0), name='schema-swagger-ui'),
-    path("integrations/", include("integrations.kto.urls")),
+    path("api/v1/integrations/", include("integrations.kto.urls")),
+    path("api/v1/integrations/youtube/", include("integrations.youtube.urls")),
+
 ]

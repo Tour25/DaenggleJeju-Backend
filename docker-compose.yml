@@ -3,6 +3,9 @@ version: '3.8'
 services:
   db:
     image: mysql:8.0
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
       MYSQL_DATABASE: ${MYSQL_DATABASE}
@@ -12,6 +15,7 @@ services:
       - "3307:3306"
     env_file:
       - .env
+
 
   backend:
     build: .
