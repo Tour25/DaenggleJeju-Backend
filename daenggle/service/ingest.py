@@ -4,7 +4,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional
 
 from django.conf import settings
-from django.db import transaction
+from django.db import transaction, IntegrityError
 from django.utils.dateparse import parse_datetime
 
 from integrations.youtube.client import YouTubeClient
@@ -31,20 +31,35 @@ def _to_int(v):
         return None
 
 @transaction.atomic
-def _upsert_batch(items: List[Dict], *, category: str, keyword: str = "",
-                  context_id: str = "", context_name: str = "",
-                  max_duration_seconds: Optional[int] = 60) -> int:
-
+def _upsert_batch(
+    items: List[Dict],
+    *,
+    category: str,
+    keyword: str = "",
+    context_id: str = "",
+    context_name: str = "",
+    max_duration_seconds: Optional[int] = 60,
+) -> int:
     saved = 0
+    seen = set()  # (video_id, category, context_id)
+
     for it in items:
         vid = it.get("id")
+        if not vid:
+            continue
+
         sn = it.get("snippet", {}) or {}
         cd = it.get("contentDetails", {}) or {}
         st = it.get("statistics", {}) or {}
 
+        key = (vid, category, context_id or "")
+        if key in seen:
+            continue
+        seen.add(key)
+
         dur = iso_to_seconds(cd.get("duration"))
         if max_duration_seconds is not None and dur is not None and dur > max_duration_seconds:
-            continue  # 숏폼 기준 초과는 제외
+            continue
 
         published_at = parse_datetime(sn.get("publishedAt") or "") or datetime.now(timezone.utc)
 
@@ -64,14 +79,28 @@ def _upsert_batch(items: List[Dict], *, category: str, keyword: str = "",
             ),
         )
 
-        DaenggleTag.objects.get_or_create(
-            clip=clip,
-            category=category,
-            keyword=keyword or "",
-            context_id=context_id or "",
-            context_name=context_name or "",
-        )
+        try:
+            tag, created = DaenggleTag.objects.get_or_create(
+                clip=clip,
+                category=category,
+                context_id=context_id or "",
+                defaults={
+                    "keyword": keyword or "",
+                    "context_name": context_name or "",
+                },
+            )
+        except IntegrityError:
+
+            tag = DaenggleTag.objects.get(
+                clip=clip, category=category, context_id=context_id or ""
+            )
+            created = False
+
+        if context_name and tag.context_name != context_name:
+            DaenggleTag.objects.filter(pk=tag.pk).update(context_name=context_name)
+
         saved += 1
+
     return saved
 
 def sync_keywords(
@@ -79,11 +108,12 @@ def sync_keywords(
     *,
     days: int = 60,
     pages: int = 1,
-    max_duration_seconds: Optional[int] = 60,  # ← 여기 기본값만 바꾸면 전체 기본 기준이 바뀜
+    max_duration_seconds: Optional[int] = 60,
     category: str = DaenggleTag.Category.KEYWORD,
     context_id: str = "",
     context_name: str = "",
 ) -> Dict:
+
     client = YouTubeClient()
     published_after = days_ago_rfc3339(days)
 
@@ -92,9 +122,9 @@ def sync_keywords(
     total_saved = 0
 
     for kw in [k.strip() for k in (keywords or []) if k and k.strip()]:
-
         all_ids: List[str] = []
         next_token: Optional[str] = None
+
         for _ in range(max(1, pages)):
             resp = client.search_video_ids(
                 q=kw,
@@ -118,8 +148,9 @@ def sync_keywords(
                 deduped_ids.append(vid)
 
         saved = 0
+
         for i in range(0, len(deduped_ids), 50):
-            batch_ids = deduped_ids[i:i + 50]
+            batch_ids = deduped_ids[i : i + 50]
             details = client.get_videos_details(batch_ids)
             saved += _upsert_batch(
                 details,
