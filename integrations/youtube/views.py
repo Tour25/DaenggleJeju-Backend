@@ -3,8 +3,12 @@ from rest_framework.response import Response
 from rest_framework import status
 from drf_yasg.utils import swagger_auto_schema
 
+from .serializers import BatchSyncBody
+from .presets import TRENDING_KEYWORDS, PLACE_PRESETS, ACCOM_PRESETS
 from .serializers import YouTubeSyncRequest
+
 from daenggle.service.ingest import sync_keywords
+from daenggle.models import DaenggleTag
 
 class YouTubeSyncView(APIView):
 
@@ -27,3 +31,90 @@ class YouTubeSyncView(APIView):
         return Response({**result,
                          "limits": {"days": d["days"], "pages": d["pages"], "maxDuration": d["maxDuration"]}},
                         status=status.HTTP_200_OK)
+
+
+class YouTubeBatchSyncView(APIView):
+    @swagger_auto_schema(
+        operation_summary="원클릭 배치 수집(트렌딩/장소/숙소)",
+        tags=["Integration/YouTube"],
+        request_body=BatchSyncBody,
+    )
+    def post(self, request):
+        s = BatchSyncBody(data=request.data or {})
+        s.is_valid(raise_exception=True)
+        q = s.validated_data
+
+        include = set(q["include"])
+        days = q["days"]
+        pages = q["pages"]
+        max_dur = q.get("maxDuration")
+        place_ids = set(q.get("placeIds") or []) or None
+        acc_ids   = set(q.get("accommodationIds") or []) or None
+
+        results = {}
+
+        # 1) 트렌딩(조회수 높은 댕글용 베이스 데이터) — 태그: TREND
+        if "trending" in include:
+            res = sync_keywords(
+                TRENDING_KEYWORDS,
+                days=days,
+                pages=pages,
+                max_duration_seconds=max_dur,
+                category=DaenggleTag.Category.TREND,
+                context_id="", context_name="",
+            )
+            results["trending"] = res
+
+        # 2) 장소별
+        if "place" in include:
+            place_runs = []
+            for p in PLACE_PRESETS:
+                if place_ids and p["context_id"] not in place_ids:
+                    continue
+                place_runs.append(
+                    sync_keywords(
+                        p["keywords"],
+                        days=days,
+                        pages=pages,
+                        max_duration_seconds=max_dur,
+                        category=DaenggleTag.Category.PLACE,
+                        context_id=p["context_id"],
+                        context_name=p["context_name"],
+                    )
+                )
+            results["place"] = place_runs
+
+        # 3) 숙소별
+        if "accommodation" in include:
+            acc_runs = []
+            for a in ACCOM_PRESETS:
+                if acc_ids and a["context_id"] not in acc_ids:
+                    continue
+                acc_runs.append(
+                    sync_keywords(
+                        a["keywords"],
+                        days=days,
+                        pages=pages,
+                        max_duration_seconds=max_dur,
+                        category=DaenggleTag.Category.ACCOMMODATION,
+                        context_id=a["context_id"],
+                        context_name=a["context_name"],
+                    )
+                )
+            results["accommodation"] = acc_runs
+
+
+        summary = {"totalFound": 0, "totalSaved": 0}
+
+        def acc_total(res):
+            if isinstance(res, dict):
+                summary["totalFound"] += res.get("totalFound", 0)
+                summary["totalSaved"] += res.get("totalSaved", 0)
+
+        if "trending" in results:
+            acc_total(results["trending"])
+        for k in ("place", "accommodation"):
+            for r in results.get(k, []):
+                acc_total(r)
+
+        return Response({"summary": summary, "results": results})
