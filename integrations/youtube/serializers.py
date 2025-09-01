@@ -12,3 +12,23 @@ class YouTubeSyncRequest(serializers.Serializer):
     )
     contextId = serializers.CharField(required=False, allow_blank=True, default="")
     contextName = serializers.CharField(required=False, allow_blank=True, default="")
+
+
+class BatchSyncBody(serializers.Serializer):
+    include = serializers.ListField(
+        child=serializers.ChoiceField(["trending", "place", "accommodation"]),
+        required=False,
+        default=["trending", "place", "accommodation"],
+        help_text="돌릴 대상 선택 (기본: 전부)"
+    )
+    days = serializers.IntegerField(required=False, default=90)
+    pages = serializers.IntegerField(required=False, default=1)
+    maxDuration = serializers.IntegerField(required=False, allow_null=True, default=120)
+
+    # 특정 대상만 선별해서 돌리고 싶을 때(옵션)
+    placeIds = serializers.ListField(
+        child=serializers.CharField(), required=False, default=None
+    )
+    accommodationIds = serializers.ListField(
+        child=serializers.CharField(), required=False, default=None
+    )
