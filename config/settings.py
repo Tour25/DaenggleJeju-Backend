@@ -40,8 +40,13 @@ YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY")
 YOUTUBE_REGION_CODE = os.getenv("YOUTUBE_REGION_CODE", "KR")
 YOUTUBE_RELEVANCE_LANG = os.getenv("YOUTUBE_RELEVANCE_LANG", "ko")
 
+KAKAO_REST_API_KEY = os.environ.get("KAKAO_REST_API_KEY")
+KAKAO_REDIRECT_URI = os.environ.get("KAKAO_REDIRECT_URI")
+
 ALLOWED_HOSTS = ["localhost", "0.0.0.0","127.0.0.1"]
 
+SESSION_COOKIE_SAMESITE = "Lax"
+SESSION_COOKIE_HTTPONLY = True
 
 # Application definition
 
@@ -58,6 +63,7 @@ INSTALLED_APPS = [
     'places',
     'integrations',
     'daenggle',
+    'accounts',
 ]
 
 MIDDLEWARE = [

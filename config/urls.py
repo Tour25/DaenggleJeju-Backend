@@ -34,5 +34,5 @@ urlpatterns = [
     path("api/v1/integrations/", include("integrations.kto.urls")),
     path("api/v1/integrations/youtube/", include("integrations.youtube.urls")),
     path("api/v1/daenggle/", include("daenggle.urls")),
-
+    path("api/v1/auth/", include("accounts.urls")),
 ]
