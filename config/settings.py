@@ -48,6 +48,8 @@ ALLOWED_HOSTS = ["localhost", "0.0.0.0","127.0.0.1"]
 SESSION_COOKIE_SAMESITE = "Lax"
 SESSION_COOKIE_HTTPONLY = True
 
+FRONTEND_CALLBACK_URL = os.environ.get("FRONTEND_CALLBACK_URL", "http://localhost:5173//auth/callback")
+
 # Application definition
 
 INSTALLED_APPS = [
@@ -64,6 +66,7 @@ INSTALLED_APPS = [
     'integrations',
     'daenggle',
     'accounts',
+    'members',
 ]
 
 MIDDLEWARE = [
@@ -157,6 +160,7 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
+AUTH_USER_MODEL = "members.User"
 
 # Internationalization
 # https://docs.djangoproject.com/en/4.2/topics/i18n/
