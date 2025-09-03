@@ -1,6 +1,7 @@
 from django.db import models
 from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin, BaseUserManager
 from django.utils import timezone
+from django.conf import settings
 
 class UserManager(BaseUserManager):
     def create_user(self, handle: str, password=None, **extra):
@@ -36,3 +37,26 @@ class User(AbstractBaseUser, PermissionsMixin):
 
     def __str__(self):
         return self.handle
+
+
+class MemberPreference(models.Model):
+
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="preference",
+    )
+
+    region_context_ids = models.JSONField(default=list)
+
+    style_codes = models.JSONField(default=list)
+
+    updated_at = models.DateTimeField(auto_now=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "member_preference"
+
+    def __str__(self):
+        return f"{self.user_id} / regions={len(self.region_context_ids)} / styles={self.style_codes}"
+
