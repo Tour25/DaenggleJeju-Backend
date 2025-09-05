@@ -67,6 +67,7 @@ INSTALLED_APPS = [
     'daenggle',
     'accounts',
     'members',
+    'pets',
 ]
 
 MIDDLEWARE = [
