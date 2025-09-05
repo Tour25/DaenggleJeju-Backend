@@ -31,9 +31,6 @@ class PetProfile(models.Model):
 
     size_code = models.CharField(max_length=10, choices=Size.choices)
 
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
     class Meta:
         db_table = "pets_dog_profile"
         indexes = [
@@ -41,7 +38,7 @@ class PetProfile(models.Model):
             models.Index(fields=["size_code"]),
             models.Index(fields=["breed"]),
         ]
-        ordering = ["-is_primary", "-id"]
+        ordering = ["-id"]
 
     def __str__(self):
         return f"{self.name} / {self.user_id}"
