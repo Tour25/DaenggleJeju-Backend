@@ -8,8 +8,8 @@ from rest_framework.response import Response
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
 
-from .models import PetBreed
-from .serializers import PetBreedReadSerializer
+from .models import PetBreed, PetProfile
+from .serializers import PetBreedReadSerializer, PetProfileWriteSerializer, PetProfileReadSerializer
 from .breeds import PRESET_BREEDS
 
 class PetBreedInitView(APIView):
@@ -91,3 +91,28 @@ class PetBreedSearchView(generics.ListAPIView):
         other = qs.filter(code="other")
         return other if other.exists() else PetBreed.objects.none()
 
+
+class PetProfileCreateView(APIView):
+
+    @swagger_auto_schema(
+        operation_summary="반려견 프로필 저장",
+        tags=["Pets/Profiles"],
+        request_body=PetProfileWriteSerializer,
+        responses={201: PetProfileReadSerializer},
+    )
+    def post(self, request):
+        ser = PetProfileWriteSerializer(data=request.data)
+        ser.is_valid(raise_exception=True)
+        v = ser.validated_data
+
+        breed = None
+        if v.get("breedId") is not None:
+            breed = PetBreed.objects.filter(id=v["breedId"], is_active=True).first()
+
+        pet = PetProfile.objects.create(
+            user=request.user,
+            name=v["name"],
+            size_code=v["sizeCode"],
+            breed=breed,
+        )
+        return Response(PetProfileReadSerializer(pet).data, status=status.HTTP_201_CREATED)
