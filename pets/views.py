@@ -8,12 +8,8 @@ from rest_framework.response import Response
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
 
-from .models import PetBreed
-from .serializers import (
-    PetBreedReadSerializer,
-    PetBreedInitItemSerializer,
-    PetBreedInitRequestSerializer,
-)
+from .models import PetBreed, PetProfile
+from .serializers import PetBreedReadSerializer, PetProfileWriteSerializer, PetProfileReadSerializer
 from .breeds import PRESET_BREEDS
 
 class PetBreedInitView(APIView):
@@ -54,19 +50,21 @@ class PetBreedInitView(APIView):
             status=status.HTTP_201_CREATED,
         )
 
-
 class PetBreedSearchView(generics.ListAPIView):
     serializer_class = PetBreedReadSerializer
     pagination_class = None
 
     @swagger_auto_schema(
         operation_summary="견종 검색",
+        operation_description="검색어가 없으면 전체 목록, 매칭이 없으면 기타 반환",
         tags=["Pets/Breeds"],
         manual_parameters=[
             openapi.Parameter(
-                "q", openapi.IN_QUERY,
-                description="검색어(한글명/코드 부분일치)",
+                name="q",
+                in_=openapi.IN_QUERY,
+                description="검색어(한글명/코드 부분일치). 예: '골든', '말티', 'retriever'",
                 type=openapi.TYPE_STRING,
+                required=False,
             ),
         ],
         responses={200: PetBreedReadSerializer(many=True)},
@@ -75,12 +73,46 @@ class PetBreedSearchView(generics.ListAPIView):
         return super().get(request, *args, **kwargs)
 
     def get_queryset(self):
-        q = (self.request.query_params.get("q") or "").strip()
         qs = PetBreed.objects.filter(is_active=True)
-        if q:
-            slug_q = slugify(q, allow_unicode=True)
-            qs = qs.filter(
-                Q(name_ko__icontains=q) |
-                Q(code__icontains=slug_q)
-            )
-        return qs.order_by("name_ko")
+        q = (self.request.query_params.get("q") or "").strip()
+
+        if not q:
+            return qs.order_by("name_ko")
+
+        slug_q = slugify(q, allow_unicode=True)
+        matched = qs.filter(
+            Q(name_ko__icontains=q) |
+            Q(code__icontains=slug_q)
+        ).order_by("name_ko")
+
+        if matched.exists():
+            return matched
+
+        other = qs.filter(code="other")
+        return other if other.exists() else PetBreed.objects.none()
+
+
+class PetProfileCreateView(APIView):
+
+    @swagger_auto_schema(
+        operation_summary="반려견 프로필 저장",
+        tags=["Pets/Profiles"],
+        request_body=PetProfileWriteSerializer,
+        responses={201: PetProfileReadSerializer},
+    )
+    def post(self, request):
+        ser = PetProfileWriteSerializer(data=request.data)
+        ser.is_valid(raise_exception=True)
+        v = ser.validated_data
+
+        breed = None
+        if v.get("breedId") is not None:
+            breed = PetBreed.objects.filter(id=v["breedId"], is_active=True).first()
+
+        pet = PetProfile.objects.create(
+            user=request.user,
+            name=v["name"],
+            size_code=v["sizeCode"],
+            breed=breed,
+        )
+        return Response(PetProfileReadSerializer(pet).data, status=status.HTTP_201_CREATED)

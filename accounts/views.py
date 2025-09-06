@@ -4,7 +4,7 @@ import requests
 from urllib.parse import urlencode
 from django.conf import settings
 from drf_yasg import openapi
-from django.contrib.auth import get_user_model, login
+from django.contrib.auth import get_user_model, login, logout
 from django.db import transaction
 from django.shortcuts import redirect
 from rest_framework.views import APIView
@@ -13,6 +13,8 @@ from rest_framework.response import Response
 from drf_yasg.utils import swagger_auto_schema
 from .models import SocialAccount
 from rest_framework.permissions import IsAuthenticated
+import uuid
+
 
 User = get_user_model()
 
@@ -132,3 +134,51 @@ class MeView(APIView):
     def get(self, request):
         handle = getattr(request.user, "handle", getattr(request.user, "username", None))
         return Response({"id": request.user.id, "handle": handle})
+
+
+class DevLoginView(APIView):
+    permission_classes = [AllowAny]
+
+    @swagger_auto_schema(
+        operation_summary="DEV 로그인 - 개발용",
+        tags=["Auth/Dev"],
+        request_body=None,
+        responses={
+            200: openapi.Schema(
+                type=openapi.TYPE_OBJECT,
+                properties={
+                    "userId": openapi.Schema(type=openapi.TYPE_INTEGER),
+                    "handle": openapi.Schema(type=openapi.TYPE_STRING),
+                },
+            )
+        },
+    )
+    def post(self, request):
+
+        if not settings.DEBUG:
+            return Response({"detail": "Not available in production."}, status=404)
+
+        User = get_user_model()
+
+        handle = f"dev_{uuid.uuid4().hex[:8]}"
+
+        user, _ = User.objects.get_or_create(handle=handle, defaults={"is_active": True})
+
+        user.backend = "django.contrib.auth.backends.ModelBackend"
+        login(request, user)
+
+        return Response({"userId": user.id, "handle": user.handle}, status=200)
+
+
+class DevLogoutView(APIView):
+    permission_classes = [AllowAny]
+
+    @swagger_auto_schema(
+        operation_summary="DEV 로그아웃 - 개발용",
+        tags=["Auth/Dev"],
+        request_body=None,
+        responses={204: "No Content"},
+    )
+    def post(self, request):
+        logout(request)
+        return Response(status=204)
