@@ -33,3 +33,7 @@ class PlaceMapAllQuery(serializers.Serializer):
         required=False, default=[],
         help_text="편의: parking(주차), bbq, wifi, takeout, yard(마당), pets_zone(애견전용), barking_ok, jacuzzi"
     )
+
+class PlaceDetailQuery(serializers.Serializer):
+    userLat = serializers.FloatField(required=False)
+    userLng = serializers.FloatField(required=False)
