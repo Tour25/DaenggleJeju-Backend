@@ -25,10 +25,3 @@ class BatchSyncBody(serializers.Serializer):
     pages = serializers.IntegerField(required=False, default=1)
     maxDuration = serializers.IntegerField(required=False, allow_null=True, default=120)
 
-    # 특정 대상만 선별해서 돌리고 싶을 때(옵션)
-    placeIds = serializers.ListField(
-        child=serializers.CharField(), required=False, default=None
-    )
-    accommodationIds = serializers.ListField(
-        child=serializers.CharField(), required=False, default=None
-    )
