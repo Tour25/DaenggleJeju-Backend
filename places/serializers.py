@@ -1,14 +1,13 @@
 from rest_framework import serializers
 
 class PlaceMapAllQuery(serializers.Serializer):
-
-    bbox = serializers.CharField(help_text="지도의 가시영역 BBOX: minLng,minLat,maxLng,maxLat (예: 126.2,33.2,126.7,33.6)")
-
+    bbox = serializers.CharField(
+        help_text="지도의 가시영역 BBOX: minLng,minLat,maxLng,maxLat (예: 126.2,33.2,126.7,33.6)"
+    )
     contentTypeId = serializers.IntegerField(
         required=False,
         help_text="예: 32=숙박, 39=음식점, 12=관광지, 28=레포츠, 38=쇼핑"
     )
-
     limit = serializers.IntegerField(required=False, min_value=1, max_value=100, default=100)
 
     sizes = serializers.ListField(
@@ -44,27 +43,28 @@ class PlaceListQuery(serializers.Serializer):
         required=False,
         help_text="예: 32=숙박, 39=음식점, 12=관광지, 28=레포츠, 38=쇼핑"
     )
-
     limit  = serializers.IntegerField(required=False, min_value=1, default=50)
     offset = serializers.IntegerField(required=False, min_value=0, default=0)
-    all    = serializers.BooleanField(required=False, default=False, help_text="true면 전체 반환(슬라이싱 없음)")
+    all    = serializers.BooleanField(required=False, default=False, help_text="true면 전체 반환")
 
-    sizes = serializers.ListField(
-        child=serializers.ChoiceField(choices=["small", "med", "large", "xlarge", "all"]),
-        required=False, default=[]
-    )
-    areas = serializers.ListField(
-        child=serializers.ChoiceField(choices=["indoor", "outdoor", "allarea"]),
-        required=False, default=[]
-    )
-    conditions = serializers.ListField(
-        child=serializers.ChoiceField(choices=["leash", "carrier", "leash_free", "diaper"]),
-        required=False, default=[]
-    )
-    amenities = serializers.ListField(
-        child=serializers.ChoiceField(choices=["parking", "bbq", "wifi", "takeout", "yard", "pets_zone", "barking_ok", "jacuzzi"]),
-        required=False, default=[]
-    )
+    sizes = serializers.ListField(child=serializers.ChoiceField(choices=["small", "med", "large", "xlarge", "all"]),
+                                 required=False, default=[])
+    areas = serializers.ListField(child=serializers.ChoiceField(choices=["indoor", "outdoor", "allarea"]),
+                                 required=False, default=[])
+    conditions = serializers.ListField(child=serializers.ChoiceField(choices=["leash", "carrier", "leash_free", "diaper"]),
+                                 required=False, default=[])
+    amenities  = serializers.ListField(child=serializers.ChoiceField(
+                                     choices=["parking","bbq","wifi","takeout","yard","pets_zone","barking_ok","jacuzzi"]),
+                                 required=False, default=[])
 
+    userLat = serializers.FloatField(required=False)
+    userLng = serializers.FloatField(required=False)
+
+class PlaceSearchQuery(serializers.Serializer):
+    q = serializers.CharField(min_length=2, help_text="검색어(지역/장소명). 예: '애월 카페', '성산', '우도'")
+    contentTypeId = serializers.IntegerField(required=False, help_text="예: 32=숙박, 39=음식점 등")
+    limit  = serializers.IntegerField(required=False, min_value=1, default=50)
+    offset = serializers.IntegerField(required=False, min_value=0, default=0)
+    all    = serializers.BooleanField(required=False, default=False, help_text="true면 전체 반환")
     userLat = serializers.FloatField(required=False)
     userLng = serializers.FloatField(required=False)

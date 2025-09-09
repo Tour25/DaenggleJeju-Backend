@@ -2,6 +2,9 @@ from functools import reduce
 from operator import or_
 from typing import Optional, Tuple, List, Dict
 from math import radians, sin, cos, asin, sqrt
+import re
+from django.db.models import Q
+
 
 from django.db.models import Q
 from .constants import (
@@ -192,3 +195,23 @@ def build_filter_q(query) -> Q:
         q &= or_icontains(["overview", "pet_policy__etc_info"], amen_terms)
 
     return q
+
+def split_terms(qstr: str) -> List[str]:
+
+    if not qstr:
+        return []
+    tokens = re.split(r"[\s,]+", str(qstr).strip())
+    return [t for t in tokens if len(t) >= 2]
+
+def and_icontains(fields: List[str], terms: List[str]) -> Q:
+    if not fields or not terms:
+        return Q()
+
+    q_total = None
+    for t in terms:
+        subq = Q()
+        for f in fields:
+            subq |= Q(**{f"{f}__icontains": t})
+        q_total = subq if q_total is None else (q_total & subq)
+
+    return q_total or Q()

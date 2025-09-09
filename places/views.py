@@ -1,6 +1,6 @@
 from typing import Optional
 
-from django.db.models import Prefetch, Q
+from django.db.models import Prefetch, Case, When, Value, IntegerField
 from django.shortcuts import get_object_or_404
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -8,14 +8,19 @@ from rest_framework import status
 from drf_yasg.utils import swagger_auto_schema
 
 from .models import Place, PlaceImage
-from .serializers import PlaceMapAllQuery, PlaceDetailQuery, PlaceListQuery
+from .serializers import (
+    PlaceMapAllQuery, PlaceDetailQuery, PlaceListQuery, PlaceSearchQuery
+)
 from .constants import CONTENT_TYPE_LABELS, SIZE_KEYWORDS, AREA_KEYWORDS, AMENITY_KEYWORDS
-from .utils import (NO_IMAGE_TEXT,
-    parse_bbox, or_icontains, text_or_unknown, parking_text,
-    extract_conditions, conditions_text, split_lines, prune_empty,
+from .utils import (
+    NO_IMAGE_TEXT,
+    parse_bbox, text_or_unknown, parking_text,
+    conditions_text, split_lines, prune_empty,
     haversine_km, address_brief, thumb_or_text, collect_text,
     find_labels, place_type_label, build_filter_q,
+    split_terms, and_icontains,
 )
+
 
 class PlaceMapAllView(APIView):
     @swagger_auto_schema(
@@ -28,6 +33,7 @@ class PlaceMapAllView(APIView):
         s.is_valid(raise_exception=True)
         q = s.validated_data
 
+        # bbox 파싱
         try:
             min_lng, min_lat, max_lng, max_lat = parse_bbox(q["bbox"])
         except Exception:
@@ -76,7 +82,6 @@ class PlaceListView(APIView):
         q = s.validated_data
 
         qs = Place.objects.filter(mapx__isnull=False, mapy__isnull=False)
-
         if q.get("contentTypeId"):
             qs = qs.filter(content_type_id=q["contentTypeId"])
 
@@ -193,7 +198,7 @@ class PlaceDetailFullView(APIView):
         chips = {
             "sizes": find_labels(src, SIZE_KEYWORDS),
             "areas": find_labels(src, AREA_KEYWORDS),
-            "conditions": conditions_text(policy),
+            "conditions": conditions_text(policy),  # 문자열
             "amenities": find_labels(src, AMENITY_KEYWORDS),
         }
 
@@ -219,3 +224,88 @@ class PlaceDetailFullView(APIView):
             data["distanceText"] = f"{dist_km}km"
 
         return Response(prune_empty(data))
+
+
+class PlaceSearchView(APIView):
+    @swagger_auto_schema(
+        operation_summary="장소 검색",
+        tags=["Places"],
+        query_serializer=PlaceSearchQuery,
+    )
+    def get(self, request):
+        s = PlaceSearchQuery(data=request.query_params)
+        s.is_valid(raise_exception=True)
+        q = s.validated_data
+
+        qs = Place.objects.filter(mapx__isnull=False, mapy__isnull=False)
+        if q.get("contentTypeId"):
+            qs = qs.filter(content_type_id=q["contentTypeId"])
+
+        terms = split_terms(q["q"])
+        if not terms:
+            return Response({"detail": "검색어는 2글자 이상으로 입력해 주세요."}, status=400)
+        qs = qs.filter(and_icontains(["title", "addr1", "overview", "pet_policy__etc_info"], terms))
+
+        score = Value(0, output_field=IntegerField())
+        for t in terms:
+            score = score + Case(
+                When(title__iexact=t,                   then=Value(100)),
+                When(title__istartswith=t,              then=Value(90)),
+                When(title__icontains=t,                then=Value(80)),
+                When(addr1__icontains=t,                then=Value(60)),
+                When(overview__icontains=t,             then=Value(20)),
+                When(pet_policy__etc_info__icontains=t, then=Value(10)),
+                default=Value(0), output_field=IntegerField()
+            )
+
+        qs = qs.select_related("pet_policy").prefetch_related(
+            Prefetch("images", queryset=PlaceImage.objects.order_by("id"))
+        ).annotate(score=score).order_by("-score", "-updated_at")
+
+        if not q.get("all"):
+            start = q.get("offset", 0)
+            end = start + q.get("limit", 50)
+            qs = qs[start:end]
+
+        user_lat = q.get("userLat")
+        user_lng = q.get("userLng")
+
+        items = []
+        for p in qs:
+            policy = getattr(p, "pet_policy", None)
+
+            src = collect_text(p)
+            sizes = find_labels(src, SIZE_KEYWORDS)
+            areas = find_labels(src, AREA_KEYWORDS)
+            amens = find_labels(src, AMENITY_KEYWORDS)
+            cond = conditions_text(policy)
+
+            chips_list = []
+            if sizes: chips_list.append(sizes[0])
+            if areas: chips_list.append(areas[0])
+            if cond and cond != "정보없음": chips_list.append(cond)
+            if amens: chips_list.append(amens[0])
+
+            chips_value = chips_list[0] if len(chips_list) == 1 else chips_list
+
+            meta_line = f"{address_brief(p.addr1)} · {place_type_label(p) or ''}".rstrip(" ·")
+
+            dist_text = None
+            if user_lat is not None and user_lng is not None:
+                d = haversine_km(user_lat, user_lng, p.mapy, p.mapx)
+                if d is not None:
+                    dist_text = f"{d}km"
+
+            item = {
+                "contentId": p.content_id,
+                "contentType": {"id": p.content_type_id, "name": CONTENT_TYPE_LABELS.get(p.content_type_id, "기타")},
+                "title": p.title,
+                "metaLine": meta_line,
+                "distanceText": dist_text,
+                "thumbnail": thumb_or_text(p),
+                "chips": chips_value,
+            }
+
+            items.append(prune_empty(item))
+
+        return Response({"total": len(items), "items": items})
