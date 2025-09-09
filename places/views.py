@@ -2,10 +2,11 @@ from typing import Optional
 
 from django.db.models import Prefetch, Case, When, Value, IntegerField
 from django.shortcuts import get_object_or_404
+from django.contrib.contenttypes.models import ContentType
+from drf_yasg.utils import swagger_auto_schema
+from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from rest_framework import status
-from drf_yasg.utils import swagger_auto_schema
 
 from .models import Place, PlaceImage
 from .serializers import (
@@ -13,15 +14,37 @@ from .serializers import (
 )
 from .constants import CONTENT_TYPE_LABELS, SIZE_KEYWORDS, AREA_KEYWORDS, AMENITY_KEYWORDS
 from .utils import (
-    NO_IMAGE_TEXT,
     parse_bbox, text_or_unknown, parking_text,
     conditions_text, split_lines, prune_empty,
     haversine_km, address_brief, thumb_or_text, collect_text,
     find_labels, place_type_label, build_filter_q,
     split_terms, and_icontains,
 )
+from scraps.models import Scrap
 
 
+# ---------- helpers ----------
+def _scrapped_pk_set(user, places):
+    if not (user and user.is_authenticated):
+        return set()
+    pks = [p.pk for p in places]
+    if not pks:
+        return set()
+    ct = ContentType.objects.get_for_model(Place)
+    return set(
+        Scrap.objects.filter(user=user, content_type=ct, object_id__in=pks)
+                     .values_list("object_id", flat=True)
+    )
+
+
+def _scrapped_bool(user, place: Place) -> bool:
+    if not (user and user.is_authenticated):
+        return False
+    ct = ContentType.objects.get_for_model(Place)
+    return Scrap.objects.filter(user=user, content_type=ct, object_id=place.pk).exists()
+
+
+# ---------- views ----------
 class PlaceMapAllView(APIView):
     @swagger_auto_schema(
         operation_summary="장소 전체 목록 조회 - 지도",
@@ -33,7 +56,6 @@ class PlaceMapAllView(APIView):
         s.is_valid(raise_exception=True)
         q = s.validated_data
 
-        # bbox 파싱
         try:
             min_lng, min_lat, max_lng, max_lat = parse_bbox(q["bbox"])
         except Exception:
@@ -58,6 +80,9 @@ class PlaceMapAllView(APIView):
                 .order_by("-updated_at")[: q.get("limit", 100)]
         )
 
+        rows = list(base)
+        scraped_set = _scrapped_pk_set(request.user, rows)
+
         items = [{
             "contentId": p.content_id,
             "contentType": {"id": p.content_type_id, "name": CONTENT_TYPE_LABELS.get(p.content_type_id, "기타")},
@@ -65,7 +90,8 @@ class PlaceMapAllView(APIView):
             "lat": p.mapy,
             "lng": p.mapx,
             "thumbnail": (p.images.first().thumb or p.images.first().origin) if p.images.first() else None,
-        } for p in base]
+            "isScrapped": (p.pk in scraped_set),
+        } for p in rows]
 
         return Response({"total": len(items), "items": items})
 
@@ -87,27 +113,30 @@ class PlaceListView(APIView):
 
         qs = qs.filter(build_filter_q(q))
 
-        qs = qs.select_related("pet_policy").prefetch_related(
-            Prefetch("images", queryset=PlaceImage.objects.order_by("id"))
-        ).order_by("-updated_at")
+        qs = (qs.select_related("pet_policy")
+                .prefetch_related(Prefetch("images", queryset=PlaceImage.objects.order_by("id")))
+                .order_by("-updated_at"))
 
         if not q.get("all"):
             start = q.get("offset", 0)
             end = start + q.get("limit", 50)
             qs = qs[start:end]
 
+        rows = list(qs)
+        scraped_set = _scrapped_pk_set(request.user, rows)
+
         user_lat = q.get("userLat")
         user_lng = q.get("userLng")
 
         items = []
-        for p in qs:
+        for p in rows:
             policy = getattr(p, "pet_policy", None)
 
             src = collect_text(p)
             sizes = find_labels(src, SIZE_KEYWORDS)
             areas = find_labels(src, AREA_KEYWORDS)
             amens = find_labels(src, AMENITY_KEYWORDS)
-            cond  = conditions_text(policy)
+            cond = conditions_text(policy)
 
             chips = []
             if sizes: chips.append(sizes[0])
@@ -131,6 +160,7 @@ class PlaceListView(APIView):
                 "distanceText": dist_text,
                 "thumbnail": thumb_or_text(p),
                 "chips": chips,
+                "isScrapped": (p.pk in scraped_set),
             })
 
         return Response({"total": len(items), "items": items})
@@ -167,6 +197,7 @@ class PlaceDetailView(APIView):
             "acmpyTypeCd": text_or_unknown(getattr(policy, "acmpy_type_cd", None)),
             "conditions": conditions_text(policy),
             "thumbnail": thumb_or_text(p),
+            "isScrapped": _scrapped_bool(request.user, p),
         }
         if dist_km is not None:
             data["distanceText"] = f"{dist_km}km"
@@ -198,7 +229,7 @@ class PlaceDetailFullView(APIView):
         chips = {
             "sizes": find_labels(src, SIZE_KEYWORDS),
             "areas": find_labels(src, AREA_KEYWORDS),
-            "conditions": conditions_text(policy),  # 문자열
+            "conditions": conditions_text(policy),
             "amenities": find_labels(src, AMENITY_KEYWORDS),
         }
 
@@ -215,6 +246,7 @@ class PlaceDetailFullView(APIView):
                 "acmpyTypeCd": text_or_unknown(getattr(policy, "acmpy_type_cd", None)),
                 "notes": split_lines(getattr(policy, "etc_info", "")),
             },
+            "isScrapped": _scrapped_bool(request.user, p),
         }
 
         dist_km: Optional[float] = None
@@ -244,6 +276,7 @@ class PlaceSearchView(APIView):
         terms = split_terms(q["q"])
         if not terms:
             return Response({"detail": "검색어는 2글자 이상으로 입력해 주세요."}, status=400)
+
         qs = qs.filter(and_icontains(["title", "addr1", "overview", "pet_policy__etc_info"], terms))
 
         score = Value(0, output_field=IntegerField())
@@ -255,23 +288,27 @@ class PlaceSearchView(APIView):
                 When(addr1__icontains=t,                then=Value(60)),
                 When(overview__icontains=t,             then=Value(20)),
                 When(pet_policy__etc_info__icontains=t, then=Value(10)),
-                default=Value(0), output_field=IntegerField()
+                default=Value(0), output_field=IntegerField(),
             )
 
-        qs = qs.select_related("pet_policy").prefetch_related(
-            Prefetch("images", queryset=PlaceImage.objects.order_by("id"))
-        ).annotate(score=score).order_by("-score", "-updated_at")
+        qs = (qs.select_related("pet_policy")
+                .prefetch_related(Prefetch("images", queryset=PlaceImage.objects.order_by("id")))
+                .annotate(score=score)
+                .order_by("-score", "-updated_at"))
 
         if not q.get("all"):
             start = q.get("offset", 0)
             end = start + q.get("limit", 50)
             qs = qs[start:end]
 
+        rows = list(qs)
+        scraped_set = _scrapped_pk_set(request.user, rows)
+
         user_lat = q.get("userLat")
         user_lng = q.get("userLng")
 
         items = []
-        for p in qs:
+        for p in rows:
             policy = getattr(p, "pet_policy", None)
 
             src = collect_text(p)
@@ -304,8 +341,8 @@ class PlaceSearchView(APIView):
                 "distanceText": dist_text,
                 "thumbnail": thumb_or_text(p),
                 "chips": chips_value,
+                "isScrapped": (p.pk in scraped_set),
             }
-
             items.append(prune_empty(item))
 
         return Response({"total": len(items), "items": items})

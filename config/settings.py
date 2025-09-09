@@ -68,6 +68,7 @@ INSTALLED_APPS = [
     'accounts',
     'members',
     'pets',
+    "scraps"
 ]
 
 MIDDLEWARE = [
