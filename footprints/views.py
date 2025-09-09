@@ -10,7 +10,7 @@ from typing import Optional
 from places.models import Place, PlaceImage
 from places.constants import CONTENT_TYPE_LABELS
 from .models import Footprint
-from .serializers import FootprintCreateSerializer, MyFootprintListQuery
+from .serializers import FootprintCreateSerializer, MyFootprintListQuery, PlaceFootprintListQuery
 from places.utils import address_brief, thumb_or_text, haversine_km, place_type_label, prune_empty
 
 COND_LABELS = {
@@ -150,7 +150,7 @@ class MyFootprintsListView(APIView):
             if welc_chip:  chips.append(welc_chip)
 
             created = localtime(fp.created_at)
-            created_text = created.strftime("%Y.%m.%d")
+            created_text = created.strftime("%Y-%m-%d")
 
             dist_text = None
             if user_lat is not None and user_lng is not None and p.mapy is not None and p.mapx is not None:
@@ -167,7 +167,6 @@ class MyFootprintsListView(APIView):
                 },
                 "title": p.title,
                 "metaLine": f"{address_brief(p.addr1)} · {place_type_label(p) or ''}".rstrip(" ·"),
-                "createdAt": created.isoformat(),
                 "createdAtText": created_text,
                 "distanceText": dist_text,
                 "thumbnail": thumb_or_text(p),
@@ -178,3 +177,59 @@ class MyFootprintsListView(APIView):
             items.append(prune_empty(item))
 
         return Response({"total": Footprint.objects.filter(user=request.user).count(), "items": items})
+
+
+class PlaceFootprintsListView(APIView):
+
+    @swagger_auto_schema(
+        operation_summary="발자국 목록 조회",
+        tags=["Footprints"],
+        query_serializer=PlaceFootprintListQuery,
+    )
+    def get(self, request, contentId: int):
+
+        place = get_object_or_404(Place, content_id=contentId)
+
+        s = PlaceFootprintListQuery(data=request.query_params)
+        s.is_valid(raise_exception=True)
+        q = s.validated_data
+        start = q.get("offset", 0)
+        end = start + q.get("limit", 20)
+
+        qs = (
+            Footprint.objects
+            .filter(place=place)
+            .select_related("user")
+            .order_by("-created_at")
+        )
+        total = qs.count()
+        rows = list(qs[start:end])
+
+        uid = request.user.id if request.user.is_authenticated else None
+        items = []
+        for fp in rows:
+            chips = []
+            entry = _entry_chip(fp)
+            conds = _conditions_chip(fp)
+            welc = _welcome_chip(fp)
+            if entry: chips.append(entry)
+            if conds: chips.append(conds)
+            if welc: chips.append(welc)
+
+            created = localtime(fp.created_at)
+            created_text = created.strftime("%Y-%m-%d")
+            item = {
+                "footprintId": fp.id,
+                "writer": prune_empty({
+                    "userId": fp.user_id,
+                    "handle": getattr(fp.user, "handle", None),
+                }),
+                "createdAtText": created_text,
+                "chips": chips,
+                "welcome": fp.welcome,
+                "body": fp.body,
+                "isMine": (uid == fp.user_id),
+            }
+            items.append(prune_empty(item))
+
+        return Response({"total": total, "items": items})

@@ -33,3 +33,8 @@ class MyFootprintListQuery(serializers.Serializer):
     contentTypeId = serializers.IntegerField(required=False)
     limit  = serializers.IntegerField(required=False, min_value=1, default=20)
     offset = serializers.IntegerField(required=False, min_value=0, default=0)
+
+
+class PlaceFootprintListQuery(serializers.Serializer):
+    limit  = serializers.IntegerField(required=False, min_value=1, default=20)
+    offset = serializers.IntegerField(required=False, min_value=0, default=0)
