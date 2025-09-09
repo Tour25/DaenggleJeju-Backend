@@ -18,6 +18,8 @@ import uuid
 
 User = get_user_model()
 
+DEV_HANDLE = "dev"
+
 code_param  = openapi.Parameter("code",  openapi.IN_QUERY, type=openapi.TYPE_STRING, required=False)
 state_param = openapi.Parameter("state", openapi.IN_QUERY, type=openapi.TYPE_STRING, required=False)
 err_param   = openapi.Parameter("error", openapi.IN_QUERY, type=openapi.TYPE_STRING, required=False)
@@ -131,6 +133,8 @@ class KakaoCallbackView(APIView):
 
 class MeView(APIView):
     permission_classes = [IsAuthenticated]
+
+    @swagger_auto_schema(operation_summary="현재 로그인 된 사용자 조회",tags=["Auth"] )
     def get(self, request):
         handle = getattr(request.user, "handle", getattr(request.user, "username", None))
         return Response({"id": request.user.id, "handle": handle})
@@ -142,7 +146,6 @@ class DevLoginView(APIView):
     @swagger_auto_schema(
         operation_summary="DEV 로그인 - 개발용",
         tags=["Auth/Dev"],
-        request_body=None,
         responses={
             200: openapi.Schema(
                 type=openapi.TYPE_OBJECT,
@@ -154,19 +157,15 @@ class DevLoginView(APIView):
         },
     )
     def post(self, request):
-
         if not settings.DEBUG:
             return Response({"detail": "Not available in production."}, status=404)
 
         User = get_user_model()
-
-        handle = f"dev_{uuid.uuid4().hex[:8]}"
-
-        user, _ = User.objects.get_or_create(handle=handle, defaults={"is_active": True})
-
-        user.backend = "django.contrib.auth.backends.ModelBackend"
-        login(request, user)
-
+        user, _ = User.objects.get_or_create(
+            handle=DEV_HANDLE,
+            defaults={"is_active": True}
+        )
+        login(request, user, backend="django.contrib.auth.backends.ModelBackend")
         return Response({"userId": user.id, "handle": user.handle}, status=200)
 
 
