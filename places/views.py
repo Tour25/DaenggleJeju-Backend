@@ -1,6 +1,6 @@
 from typing import Optional
 
-from django.db.models import Prefetch, Case, When, Value, IntegerField
+from django.db.models import Prefetch, Case, When, Value, IntegerField, Count
 from django.shortcuts import get_object_or_404
 from django.contrib.contenttypes.models import ContentType
 from drf_yasg.utils import swagger_auto_schema
@@ -22,8 +22,6 @@ from .utils import (
 )
 from scraps.models import Scrap
 
-
-# ---------- helpers ----------
 def _scrapped_pk_set(user, places):
     if not (user and user.is_authenticated):
         return set()
@@ -43,8 +41,24 @@ def _scrapped_bool(user, place: Place) -> bool:
     ct = ContentType.objects.get_for_model(Place)
     return Scrap.objects.filter(user=user, content_type=ct, object_id=place.pk).exists()
 
+def _scrap_counts_for_places(places) -> dict[int, int]:
+    pks = [p.pk for p in places]
+    if not pks:
+        return {}
+    ct = ContentType.objects.get_for_model(Place)
+    rows = (
+        Scrap.objects
+        .filter(content_type=ct, object_id__in=pks)
+        .values("object_id")
+        .annotate(c=Count("id"))
+    )
+    return {r["object_id"]: r["c"] for r in rows}
 
-# ---------- views ----------
+def _scrap_count_for_place(place: Place) -> int:
+    ct = ContentType.objects.get_for_model(Place)
+    return Scrap.objects.filter(content_type=ct, object_id=place.pk).count()
+
+
 class PlaceMapAllView(APIView):
     @swagger_auto_schema(
         operation_summary="장소 전체 목록 조회 - 지도",
@@ -82,6 +96,7 @@ class PlaceMapAllView(APIView):
 
         rows = list(base)
         scraped_set = _scrapped_pk_set(request.user, rows)
+        scrap_counts = _scrap_counts_for_places(rows)
 
         items = [{
             "contentId": p.content_id,
@@ -91,6 +106,7 @@ class PlaceMapAllView(APIView):
             "lng": p.mapx,
             "thumbnail": (p.images.first().thumb or p.images.first().origin) if p.images.first() else None,
             "isScrapped": (p.pk in scraped_set),
+            "scrapCount": scrap_counts.get(p.pk, 0),
         } for p in rows]
 
         return Response({"total": len(items), "items": items})
@@ -124,6 +140,7 @@ class PlaceListView(APIView):
 
         rows = list(qs)
         scraped_set = _scrapped_pk_set(request.user, rows)
+        scrap_counts = _scrap_counts_for_places(rows)
 
         user_lat = q.get("userLat")
         user_lng = q.get("userLng")
@@ -161,6 +178,7 @@ class PlaceListView(APIView):
                 "thumbnail": thumb_or_text(p),
                 "chips": chips,
                 "isScrapped": (p.pk in scraped_set),
+                "scrapCount": scrap_counts.get(p.pk, 0),
             })
 
         return Response({"total": len(items), "items": items})
@@ -198,6 +216,7 @@ class PlaceDetailView(APIView):
             "conditions": conditions_text(policy),
             "thumbnail": thumb_or_text(p),
             "isScrapped": _scrapped_bool(request.user, p),
+            "scrapCount": _scrap_count_for_place(p),
         }
         if dist_km is not None:
             data["distanceText"] = f"{dist_km}km"
@@ -207,7 +226,7 @@ class PlaceDetailView(APIView):
 
 class PlaceDetailFullView(APIView):
     @swagger_auto_schema(
-        operation_summary="장소 상세 조회(풀 데이터)",
+        operation_summary="장소 상세 조회",
         tags=["Places"],
         query_serializer=PlaceDetailQuery,
     )
@@ -247,6 +266,7 @@ class PlaceDetailFullView(APIView):
                 "notes": split_lines(getattr(policy, "etc_info", "")),
             },
             "isScrapped": _scrapped_bool(request.user, p),
+            "scrapCount": _scrap_count_for_place(p),
         }
 
         dist_km: Optional[float] = None
@@ -303,6 +323,7 @@ class PlaceSearchView(APIView):
 
         rows = list(qs)
         scraped_set = _scrapped_pk_set(request.user, rows)
+        scrap_counts = _scrap_counts_for_places(rows)
 
         user_lat = q.get("userLat")
         user_lng = q.get("userLng")
@@ -342,6 +363,7 @@ class PlaceSearchView(APIView):
                 "thumbnail": thumb_or_text(p),
                 "chips": chips_value,
                 "isScrapped": (p.pk in scraped_set),
+                "scrapCount": _scrap_count_for_place(p),
             }
             items.append(prune_empty(item))
 
