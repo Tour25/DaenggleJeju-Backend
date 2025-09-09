@@ -9,7 +9,8 @@ from .serializers import MemberPreferenceWriteSerializer, MemberPreferenceReadSe
 
 class MemberPreferenceUpsertView(APIView):
     @swagger_auto_schema(
-        operation_summary="큐레이션 선호하는 여행 스타일 저장",
+        operation_summary="사용자 여행 스타일 저장",
+        operation_description="큐레이션을 기반으로 사용자의 여행 스타일을 저장합니다.",
         tags=["Members"],
         request_body=MemberPreferenceWriteSerializer,
         responses={200: MemberPreferenceReadSerializer},

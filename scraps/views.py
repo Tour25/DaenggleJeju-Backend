@@ -61,6 +61,7 @@ class ScrapView(APIView):
 
     @swagger_auto_schema(
         operation_summary="스크랩 추가/삭제",
+        operation_description="스크랩을 추가하거나 삭제합니다. type에 따라 대상을 분리합니다. 현재는 place만",
         tags=["Scraps"],
         request_body=ScrapSerializer,
         responses={
@@ -120,7 +121,10 @@ class ScrapView(APIView):
 class ScrapListView(APIView):
     permission_classes = [IsAuthenticated]
 
-    @swagger_auto_schema(operation_summary="내가 스크랩 한 장소 목록 조회", tags=["Scraps"], query_serializer=ScrapListQuery)
+    @swagger_auto_schema(operation_summary="내가 스크랩 한 장소 목록 조회",
+                         operation_description="사용자 본인이 스크랩 한 장소를 전체 조회합니다. type: place",
+                         tags=["Scraps"],
+                         query_serializer=ScrapListQuery)
     def get(self, request):
         s = ScrapListQuery(data=request.query_params)
         s.is_valid(raise_exception=True)

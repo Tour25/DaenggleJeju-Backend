@@ -12,7 +12,7 @@ from daenggle.models import DaenggleTag
 
 class YouTubeSyncView(APIView):
 
-    @swagger_auto_schema(operation_summary="YouTube 키워드 수집 실행(저장까지)", tags=["Integration/YouTube"],
+    @swagger_auto_schema(operation_summary="서버용: YouTube 키워드 수집", tags=["Integration/YouTube"],
                          request_body=YouTubeSyncRequest)
     def post(self, request):
         ser = YouTubeSyncRequest(data=request.data)
@@ -35,7 +35,8 @@ class YouTubeSyncView(APIView):
 
 class YouTubeBatchSyncView(APIView):
     @swagger_auto_schema(
-        operation_summary="원클릭 배치 수집(트렌딩/장소/숙소)",
+        operation_summary="서버용: 댕글 영상 일괄 저장 - 필수 실행",
+        operation_description="제주 관련 댕글 영상을 일괄 저장합니다. 댕글 영상 수집을 위해 실행해주세요. 서버용 api입니다.",
         tags=["Integration/YouTube"],
         request_body=BatchSyncBody,
     )

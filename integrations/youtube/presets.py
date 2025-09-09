@@ -30,6 +30,11 @@ PLACE_PRESETS = [
         "context_name": "안덕/대정",
         "keywords": ["안덕 애견동반 여행", "대정 반려견 여행", "안덕 강아지 여행", "대정 카페 반려견"]
     },
+    {
+        "context_id": "PLACE_seongsan",
+        "context_name": "성산/표선/남원",
+        "keywords": ["성산 애견동반 여행", "표선 반려견 여행", "남원 강아지 여행", "성산 카페 반려견"]
+    },
 ]
 
 ACCOM_PRESETS = [
@@ -38,5 +43,4 @@ ACCOM_PRESETS = [
         "context_name": "숙소",
         "keywords": ["제주 애견동반 숙소", "제주 독채 반려견 가능", "제주 강아지 가능 호텔", "제주 강아지 동반 숙소"]
     },
-    # TODO: 필요한 숙소 계속 추가
 ]

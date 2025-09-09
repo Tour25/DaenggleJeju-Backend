@@ -30,7 +30,7 @@ class KakaoLoginStartView(APIView):
     permission_classes = [AllowAny]
 
     @swagger_auto_schema(
-        operation_summary="카카오 로그인 시작",
+        operation_summary="카카오 로그인",
         operation_description="Kakao authorize로 302 리다이렉트합니다.",
         tags=["Auth"],
         responses={302: "Redirect to Kakao authorize"},
@@ -53,7 +53,8 @@ class KakaoCallbackView(APIView):
 
     @swagger_auto_schema(
         operation_summary="카카오 로그인 콜백",
-        operation_description="ccode/state 검증 → 토큰 교환 → /v2/user/me 조회 → 세션 로그인 → FRONTEND_CALLBACK_URL로 302 리다이렉트 (?isNew=1|0).",
+        operation_description="브라우저가 카카오 로그인/동의를 마친 뒤 리디렉트되는 콜백 URL입니다."
+                              "ccode/state 검증 → 토큰 교환 → /v2/user/me 조회 → 세션 로그인 → FRONTEND_CALLBACK_URL로 302 리다이렉트 (?isNew=1|0).",
         manual_parameters=[code_param, state_param, err_param, err_desc],
         tags=["Auth"],
         responses={302: "Redirect to / or /onboarding", 400: "Bad Request"},
@@ -134,7 +135,9 @@ class KakaoCallbackView(APIView):
 class MeView(APIView):
     permission_classes = [IsAuthenticated]
 
-    @swagger_auto_schema(operation_summary="현재 로그인 된 사용자 조회",tags=["Auth"] )
+    @swagger_auto_schema(operation_summary="현재 로그인 된 사용자 조회",
+                         operation_description="현재 로그인 된 사용자를 조회합니다.",
+                         tags=["Auth"] )
     def get(self, request):
         handle = getattr(request.user, "handle", getattr(request.user, "username", None))
         return Response({"id": request.user.id, "handle": handle})
@@ -144,7 +147,8 @@ class DevLoginView(APIView):
     permission_classes = [AllowAny]
 
     @swagger_auto_schema(
-        operation_summary="DEV 로그인 - 개발용",
+        operation_summary="DEV 로그인 - 테스트용",
+        operation_description="서버 테스트용 로그인입니다.",
         tags=["Auth/Dev"],
         responses={
             200: openapi.Schema(
@@ -173,7 +177,8 @@ class DevLogoutView(APIView):
     permission_classes = [AllowAny]
 
     @swagger_auto_schema(
-        operation_summary="DEV 로그아웃 - 개발용",
+        operation_summary="DEV 로그아웃 - 테스트용",
+        operation_description="서버 테스트용 로그아웃입니다.",
         tags=["Auth/Dev"],
         request_body=None,
         responses={204: "No Content"},
