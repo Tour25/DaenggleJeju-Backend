@@ -37,5 +37,5 @@ urlpatterns = [
     path("api/v1/auth/", include("accounts.urls")),
     path("api/v1/pets/", include("pets.urls")),
     path("api/v1/members/", include("members.urls")),
-
+    path("api/v1/places/", include("places.urls")),
 ]
