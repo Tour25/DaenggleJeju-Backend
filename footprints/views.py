@@ -55,6 +55,7 @@ class FootprintCreateView(APIView):
 
     @swagger_auto_schema(
         operation_summary="발자국 남기기",
+        operation_description="발자국 리뷰를 작성합니다.",
         tags=["Footprints"],
         request_body=FootprintCreateSerializer,
         responses={
@@ -112,6 +113,7 @@ class MyFootprintsListView(APIView):
 
     @swagger_auto_schema(
         operation_summary="내가 작성한 발자국 목록 조회",
+        operation_description="사용자 본인이 작성한 발자국 목록을 조회합니다.",
         tags=["Footprints"],
         query_serializer=MyFootprintListQuery,
     )
@@ -182,7 +184,8 @@ class MyFootprintsListView(APIView):
 class PlaceFootprintsListView(APIView):
 
     @swagger_auto_schema(
-        operation_summary="발자국 목록 조회",
+        operation_summary="장소별 발자국 전체 조회",
+        operation_description="장소에 등록된 발자국 리뷰를 전체 조회합니다.",
         tags=["Footprints"],
         query_serializer=PlaceFootprintListQuery,
     )

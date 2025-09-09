@@ -11,7 +11,9 @@ from places.models import AreaCode
 cli = KTOClient()
 
 class AreaCodeView(APIView):
-    @swagger_auto_schema(operation_summary="지역 코드 동기화 (제주 39만)", tags=["KTO"])
+    @swagger_auto_schema(operation_summary="서버용: 지역 코드 동기화 (제주(39)만) - 첫번째 실행",
+                         operation_description="제주 지역 코드를 데이터베이스에 저장합니다. 첫번째로 실행해주세요. 서버용 api입니다.",
+                         tags=["KTO"])
     def post(self, request):
 
         try:
@@ -34,28 +36,37 @@ class AreaCodeView(APIView):
         return Response({"status": "ok", "areaCode": "39"})
 
 class CategoryCodeView(APIView):
-    @swagger_auto_schema(operation_summary="카테고리 코드 동기화", tags=["KTO"])
+    @swagger_auto_schema(operation_summary="서버용: 장소 카테고리 코드 동기화 - 두번째 실행",
+                         operation_description="장소 카테고리를 데이터베이스에 저장합니다. 두번째로 실행해주세요. 서버용 api입니다.",
+                         tags=["KTO"])
     def post(self, request):
         sync_category(cli)
         return Response({"status": "ok"})
 
 
 class AreaBasedListView(APIView):
-    @swagger_auto_schema(operation_summary="지역기반 목록 조회", tags=["KTO"], query_serializer=AreaBasedListQuery)
+    @swagger_auto_schema(operation_summary="서버용: 지역 기반 목록 조회",
+                         operation_description="지역 기반으로 장소 목록을 조회합니다. 서버용 api입니다.",
+                         tags=["KTO"], query_serializer=AreaBasedListQuery)
     def get(self, request):
         ser = AreaBasedListQuery(data=request.query_params); ser.is_valid(raise_exception=True)
         body = cli.get("areaBasedList", **ser.validated_data)
         return Response(body)
 
 class LocationBasedListView(APIView):
-    @swagger_auto_schema(operation_summary="좌표기반 목록 조회", tags=["KTO"], query_serializer=LocationBasedListQuery)
+    @swagger_auto_schema(operation_summary="서버용: 좌표기반 목록 조회",
+                         operation_description="좌표 기반으로 장소 목록을 조회합니다. 서버용 api입니다.",
+                         tags=["KTO"],
+                         query_serializer=LocationBasedListQuery)
     def get(self, request):
         ser = LocationBasedListQuery(data=request.query_params); ser.is_valid(raise_exception=True)
         body = cli.get("locationBasedList", **ser.validated_data)
         return Response(body)
 
 class SearchKeywordView(APIView):
-    @swagger_auto_schema(operation_summary="키워드 검색 목록 조회", tags=["KTO"], query_serializer=SearchKeywordQuery)
+    @swagger_auto_schema(operation_summary="서버용: 키워드 검색 목록 조회",
+                         operation_description="키워드로 장소를 검색합니다. 서버용 api입니다.",
+                         tags=["KTO"], query_serializer=SearchKeywordQuery)
     def get(self, request):
         ser = SearchKeywordQuery(data=request.query_params); ser.is_valid(raise_exception=True)
         body = cli.get("searchKeyword", **ser.validated_data)
@@ -63,7 +74,8 @@ class SearchKeywordView(APIView):
 
 class DetailPreviewView(APIView):
     @swagger_auto_schema(
-        operation_summary="상세 미리보기",
+        operation_summary="서버용: 상세 미리보기",
+        operation_description="장소 상세 정보를 조회합니다. 서버용 api입니다.",
         tags=["KTO"],
         manual_parameters=[
             openapi.Parameter("contentId", openapi.IN_QUERY, type=openapi.TYPE_INTEGER, required=True),
@@ -93,7 +105,9 @@ class DetailPreviewView(APIView):
 
 
 class DailySyncView(APIView):
-    @swagger_auto_schema(operation_summary="증분 동기화 실행 (일괄 저장)", tags=["KTO"], request_body=PetTourSyncQuery)
+    @swagger_auto_schema(operation_summary="서버용: 증분 동기화 실행",
+                         operation_description="데이터가 추가되거나 수정될 경우 변경된 사항을 일괄 저장합니다. 서버용 api입니다.",
+                         tags=["KTO"], request_body=PetTourSyncQuery)
     def post(self, request):
         ser = PetTourSyncQuery(data=request.data); ser.is_valid(raise_exception=True)
         q = ser.validated_data
@@ -113,7 +127,8 @@ class DailySyncView(APIView):
 
 class BootstrapAreaView(APIView):
     @swagger_auto_schema(
-        operation_summary="제주 지역/시군구 전체 수집 + 상세 저장",
+        operation_summary="서버용: 제주 지역/시군구 전체 수집 + 상세 저장 - 세번째 실행",
+        operation_description="제주 지역 반려견 동반 가능 장소 및 상세 정보를 일괄 저장합니다. 세번째로 실행해주세요. 서버용 api입니다.",
         tags=["KTO"]
     )
     def post(self, request):
@@ -128,7 +143,10 @@ class BootstrapAreaView(APIView):
         return Response({"processed": done, "areaCode": "39"})
 
 class EnrichIdsView(APIView):
-    @swagger_auto_schema(operation_summary="특정 contentId 배열 상세 병합 저장", tags=["KTO"], request_body=EnrichIdsBody)
+    @swagger_auto_schema(operation_summary="서버용: 특정 contentId 배열 상세 병합 저장",
+                         operation_description="특정 장소에 대한 기본 정보 + 상세 정보를 저장합니다. 서버용 api입니다.",
+                         tags=["KTO"],
+                         request_body=EnrichIdsBody)
     def post(self, request):
         ser = EnrichIdsBody(data=request.data); ser.is_valid(raise_exception=True)
         cids = ser.validated_data["ids"]

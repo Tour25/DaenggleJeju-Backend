@@ -62,6 +62,8 @@ def _scrap_count_for_place(place: Place) -> int:
 class PlaceMapAllView(APIView):
     @swagger_auto_schema(
         operation_summary="장소 전체 목록 조회 - 지도",
+        operation_description="지도 기반 장소를 전체 조회합니다. contentTypeId로 장소 카테고리를 분류합니다."
+                              "12: 관광지 | 14:문화시설 | 15: 축제/공연/행사 | 28: 레포츠 | 32: 숙박 | 38: 쇼핑 |  39: 음식점",
         tags=["Places"],
         query_serializer=PlaceMapAllQuery,
     )
@@ -115,6 +117,8 @@ class PlaceMapAllView(APIView):
 class PlaceListView(APIView):
     @swagger_auto_schema(
         operation_summary="장소 전체 목록 조회 - 리스트",
+        operation_description="장소 리스트를 전체 조회합니다. contentTypeId로 장소 카테고리를 분류합니다."
+                              "12: 관광지 | 14:문화시설 | 15: 축제/공연/행사 | 28: 레포츠 | 32: 숙박 | 38: 쇼핑 |  39: 음식점",
         tags=["Places"],
         query_serializer=PlaceListQuery,
     )
@@ -187,6 +191,7 @@ class PlaceListView(APIView):
 class PlaceDetailView(APIView):
     @swagger_auto_schema(
         operation_summary="장소 단일 조회",
+        operation_description="장소를 단일 조회합니다. 기본 정보 포함.",
         tags=["Places"],
         query_serializer=PlaceDetailQuery,
     )
@@ -227,6 +232,7 @@ class PlaceDetailView(APIView):
 class PlaceDetailFullView(APIView):
     @swagger_auto_schema(
         operation_summary="장소 상세 조회",
+        operation_description="장소를 상세 조회합니다. 기본 정보 + 상세 정보까지 포함.",
         tags=["Places"],
         query_serializer=PlaceDetailQuery,
     )
@@ -281,6 +287,8 @@ class PlaceDetailFullView(APIView):
 class PlaceSearchView(APIView):
     @swagger_auto_schema(
         operation_summary="장소 검색",
+        operation_description="장소를 검색합니다. contentTypeId로 카테고리를 분류합니다."
+                              "12: 관광지 | 14:문화시설 | 15: 축제/공연/행사 | 28: 레포츠 | 32: 숙박 | 38: 쇼핑 |  39: 음식점",
         tags=["Places"],
         query_serializer=PlaceSearchQuery,
     )

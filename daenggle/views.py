@@ -6,7 +6,10 @@ from daenggle.serializers import ShortsQuery
 from daenggle.service.query import list_shorts
 
 class ShortsListView(APIView):
-    @swagger_auto_schema(operation_summary="댕글 숏폼 단일 섹션 조회", tags=["Daenggle"], query_serializer=ShortsQuery)
+    @swagger_auto_schema(operation_summary="섹션별 댕글 영상 조회",
+                         operation_description="섹션(장소/숙소/트렌드)별 댕글 영상 목록을 조회합니다.",
+                         tags=["Daenggle"],
+                         query_serializer=ShortsQuery)
     def get(self, request):
         s = ShortsQuery(data=request.query_params)
         s.is_valid(raise_exception=True)
