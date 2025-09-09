@@ -17,7 +17,6 @@ WELCOME_CHOICES = [
     (1, "아쉬워요"),
 ]
 
-
 class Footprint(models.Model):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="footprints")
     place = models.ForeignKey(Place, on_delete=models.CASCADE, related_name="footprints")

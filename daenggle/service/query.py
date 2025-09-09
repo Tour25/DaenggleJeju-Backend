@@ -8,12 +8,12 @@ from daenggle.models import DaenggleClip, DaenggleTag
 
 def _pick_thumb(clip):
     t = clip.thumbnails or {}
-    # YouTube가 주는 해상도 우선순위대로 고름
+
     for key in ("maxres", "standard", "high", "medium", "default"):
         url = (t.get(key) or {}).get("url")
         if url:
             return url
-    # 그래도 없으면 기본값
+
     return f"https://i.ytimg.com/vi/{clip.video_id}/hqdefault.jpg"
 
 def _clip_to_dto(clip) -> Dict:
@@ -58,10 +58,6 @@ def list_shorts(
         if context_id:
             qs = qs.filter(tagging__context_id=context_id)
 
-    elif feed_type == "keyword":
-        qs = qs.filter(tagging__category=DaenggleTag.Category.KEYWORD)
-        if keyword:
-            qs = qs.filter(tagging__context_name__iexact=keyword.strip())
     else:
         return {"items": [], "nextOffset": None, "hasMore": False}
 

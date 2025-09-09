@@ -12,7 +12,7 @@ from daenggle.models import DaenggleTag
 
 class YouTubeSyncView(APIView):
 
-    @swagger_auto_schema(operation_summary="서버용: YouTube 키워드 수집 실행", tags=["Integration/YouTube"],
+    @swagger_auto_schema(operation_summary="서버용: YouTube 키워드 수집", tags=["Integration/YouTube"],
                          request_body=YouTubeSyncRequest)
     def post(self, request):
         ser = YouTubeSyncRequest(data=request.data)

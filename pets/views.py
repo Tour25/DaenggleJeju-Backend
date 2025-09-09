@@ -15,7 +15,7 @@ from .breeds import PRESET_BREEDS
 class PetBreedInitView(APIView):
 
     @swagger_auto_schema(
-        operation_summary="서버용: 견종 데이터 저장",
+        operation_summary="서버용: 견종 데이터 저장 - 필수 실행",
         operation_description="견종 정보를 저장합니다. 견종 검색 및 저장을 위해 실행해주세요. 서버용 api입니다.",
         request_body=None,
         tags=["Pets/Breeds"],
