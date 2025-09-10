@@ -1,4 +1,3 @@
-# daenggle/services/ingest.py
 import re
 from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional
@@ -9,6 +8,7 @@ from django.utils.dateparse import parse_datetime
 
 from integrations.youtube.client import YouTubeClient
 from daenggle.models import DaenggleClip, DaenggleTag
+from .style_rules import infer_styles
 
 ISO = re.compile(r"PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?")
 
@@ -78,6 +78,19 @@ def _upsert_batch(
                 etag=(it.get("etag") or "")[:128],
             ),
         )
+
+        styles, meta = infer_styles(
+            title=sn.get("title") or "",
+            description=sn.get("description") or "",
+            tags=sn.get("tags") or [],
+            category=category,
+            context_name=context_name,
+            min_score=1,
+            max_labels=3,
+        )
+        if styles and (clip.styles != styles or getattr(clip, "style_meta", {}) != meta):
+
+            DaenggleClip.objects.filter(pk=clip.pk).update(styles=styles, style_meta=meta)
 
         try:
             tag, created = DaenggleTag.objects.get_or_create(
