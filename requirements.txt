@@ -7,6 +7,8 @@ djangorestframework==3.16.1
 drf-yasg==1.21.10
 requests==2.32.5
 httpx==0.28.1
+openai==1.107.0
+
 
 
 

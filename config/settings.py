@@ -70,6 +70,7 @@ INSTALLED_APPS = [
     'pets',
     "scraps",
     "footprints",
+    "care",
 ]
 
 MIDDLEWARE = [

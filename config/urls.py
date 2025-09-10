@@ -40,4 +40,5 @@ urlpatterns = [
     path("api/v1/places/", include("places.urls")),
     path("api/v1/scraps", include("scraps.urls")),
     path("api/v1/footprints", include("footprints.urls")),
+    path("api/v1/care/", include("care.urls")),
 ]
