@@ -13,6 +13,9 @@ from places.utils import (
     address_brief, collect_text, find_labels, thumb_or_text,
     conditions_text, haversine_km, prune_empty, place_type_label,
 )
+
+from daenggle.models import DaenggleClip
+
 from .models import Scrap
 from .serializers import ScrapSerializer, ScrapListQuery
 
@@ -53,15 +56,40 @@ def _place_to_card(p, user_lat=None, user_lng=None):
     })
 
 
-def _content_type_for(model):
-    return ContentType.objects.get_for_model(model)
+def _pick_thumb(thumbnails: dict, target_w: int = 720):
+    order = ["maxres", "standard", "high", "medium", "default"]
+    for k in order:
+        t = (thumbnails or {}).get(k)
+        if t and t.get("url") and (t.get("width") or 0) >= target_w:
+            return t["url"]
+    for k in order:
+        t = (thumbnails or {}).get(k)
+        if t and t.get("url"):
+            return t["url"]
+    return None
+
+
+def _clip_to_card(c: DaenggleClip):
+    return {
+        "videoId": c.video_id,
+        "title": c.title,
+        "channelTitle": c.channel_title,
+        "publishedAt": c.published_at,
+        "durationSeconds": c.duration_seconds,
+        "thumbnailUrl": _pick_thumb(c.thumbnails, 720),
+        "watchUrl": f"https://www.youtube.com/watch?v={c.video_id}",
+        "tags": c.tags or [],
+        "styles": getattr(c, "styles", []) or [],
+        "isScrapped": True,
+    }
+
 
 class ScrapView(APIView):
     permission_classes = [IsAuthenticated]
 
     @swagger_auto_schema(
         operation_summary="스크랩 추가/삭제",
-        operation_description="스크랩을 추가하거나 삭제합니다. type에 따라 대상을 분리합니다. 현재는 place만",
+        operation_description="스크랩을 추가/삭제합니다. type: place | daenggle",
         tags=["Scraps"],
         request_body=ScrapSerializer,
         responses={
@@ -86,71 +114,106 @@ class ScrapView(APIView):
         t = s.validated_data["type"]
         obj_id = s.validated_data["id"]
 
-        if t != "place":
-            return Response({"detail": "unsupported type"}, status=400)
 
-        try:
-            place = Place.objects.get(content_id=obj_id)
-        except Place.DoesNotExist:
-            return Response({"detail": "Not found."}, status=404)
+        if t == "place":
+            try:
+                place = Place.objects.get(content_id=obj_id)
+            except Place.DoesNotExist:
+                return Response({"detail": "Not found."}, status=404)
 
-        ct = _content_type_for(Place)
+            ct = _ct_for(Place)
+            with transaction.atomic():
+                scrap, created = Scrap.objects.get_or_create(
+                    user=request.user, content_type=ct, object_id=place.pk
+                )
+                if not created:
+                    scrap.delete()
+                    return Response({"type": "place", "id": obj_id, "scraped": False, "message": "스크랩이 취소되었습니다"})
+                return Response({"type": "place", "id": obj_id, "scraped": True, "message": "스크랩되었습니다"})
 
-        with transaction.atomic():
-            scrap, created = Scrap.objects.get_or_create(
-                user=request.user, content_type=ct, object_id=place.pk
-            )
-            if not created:
 
-                scrap.delete()
-                return Response({
-                    "type": "place",
-                    "id": obj_id,
-                    "scraped": False,
-                    "message": "스크랩이 취소되었습니다"
-                })
+        if t == "daenggle":
 
-            return Response({
-                "type": "place",
-                "id": obj_id,
-                "scraped": True,
-                "message": "스크랩되었습니다"
-            })
+            clip = None
+
+            try:
+                clip = DaenggleClip.objects.get(video_id=str(obj_id))
+            except DaenggleClip.DoesNotExist:
+
+                try:
+                    clip = DaenggleClip.objects.get(pk=int(obj_id))
+                except (ValueError, DaenggleClip.DoesNotExist):
+                    return Response({"detail": "Not found."}, status=404)
+
+            ct = _ct_for(DaenggleClip)
+            with transaction.atomic():
+                scrap, created = Scrap.objects.get_or_create(
+                    user=request.user, content_type=ct, object_id=clip.pk
+                )
+                if not created:
+                    scrap.delete()
+                    return Response(
+                        {"type": "daenggle", "id": clip.video_id, "scraped": False, "message": "스크랩이 취소되었습니다"}
+                    )
+                return Response(
+                    {"type": "daenggle", "id": clip.video_id, "scraped": True, "message": "스크랩되었습니다"}
+                )
+
+        return Response({"detail": "unsupported type"}, status=400)
 
 
 class ScrapListView(APIView):
     permission_classes = [IsAuthenticated]
 
-    @swagger_auto_schema(operation_summary="내가 스크랩 한 장소 목록 조회",
-                         operation_description="사용자 본인이 스크랩 한 장소를 전체 조회합니다. type: place",
-                         tags=["Scraps"],
-                         query_serializer=ScrapListQuery)
+    @swagger_auto_schema(
+        operation_summary="내가 스크랩 한 목록 조회",
+        operation_description="사용자 본인이 스크랩한 항목 조회. type: place | daenggle",
+        tags=["Scraps"],
+        query_serializer=ScrapListQuery,
+    )
     def get(self, request):
         s = ScrapListQuery(data=request.query_params)
         s.is_valid(raise_exception=True)
         q = s.validated_data
 
-        if q["type"] != "place":
+        t = q["type"]
+        if t not in ("place", "daenggle"):
             return Response({"detail": "unsupported type"}, status=400)
 
-        ct = _ct_for(Place)
-        scraps_qs = Scrap.objects.filter(user=request.user, content_type=ct).order_by("-created_at")
-
-        total = scraps_qs.count()
         start = q.get("offset", 0)
         end = start + q.get("limit", 50)
+
+
+        if t == "place":
+            ct = _ct_for(Place)
+            scraps_qs = Scrap.objects.filter(user=request.user, content_type=ct).order_by("-created_at")
+            total = scraps_qs.count()
+            scraps = list(scraps_qs[start:end])
+
+            pks = [sc.object_id for sc in scraps]
+            places = (Place.objects.filter(pk__in=pks)
+                      .select_related("pet_policy")
+                      .prefetch_related("images"))
+
+            order = {pk: i for i, pk in enumerate(pks)}
+            places = sorted(places, key=lambda p: order.get(p.pk, 10**9))
+
+            user_lat = q.get("userLat")
+            user_lng = q.get("userLng")
+            items = [_place_to_card(p, user_lat, user_lng) for p in places]
+            return Response({"total": total, "items": items})
+
+
+        ct = _ct_for(DaenggleClip)
+        scraps_qs = Scrap.objects.filter(user=request.user, content_type=ct).order_by("-created_at")
+        total = scraps_qs.count()
         scraps = list(scraps_qs[start:end])
 
-        pks = [sc.object_id for sc in scraps]
-        places = (Place.objects.filter(pk__in=pks)
-                  .select_related("pet_policy")
-                  .prefetch_related("images"))
+        clip_pks = [sc.object_id for sc in scraps]
+        clips = DaenggleClip.objects.filter(pk__in=clip_pks)
 
-        order = {pk: i for i, pk in enumerate(pks)}
-        places = sorted(places, key=lambda p: order.get(p.pk, 10**9))
+        order = {pk: i for i, pk in enumerate(clip_pks)}
+        clips = sorted(clips, key=lambda c: order.get(c.pk, 10**9))
 
-        user_lat = q.get("userLat")
-        user_lng = q.get("userLng")
-        items = [_place_to_card(p, user_lat, user_lng) for p in places]
-
+        items = [_clip_to_card(c) for c in clips]
         return Response({"total": total, "items": items})

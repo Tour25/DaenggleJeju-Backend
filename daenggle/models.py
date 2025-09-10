@@ -14,7 +14,10 @@ class DaenggleClip(models.Model):
     etag = models.CharField(max_length=128, blank=True)
     fetched_at = models.DateTimeField(auto_now=True)
 
-    def __str__(self):
+    styles = models.JSONField(default=list, blank=True)
+    style_meta = models.JSONField(default=dict, blank=True)
+
+def __str__(self):
         return f"{self.title} ({self.video_id})"
 
 

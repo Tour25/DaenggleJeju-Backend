@@ -33,7 +33,7 @@ urlpatterns = [
     path('swagger/', schema_view.with_ui('swagger', cache_timeout=0), name='schema-swagger-ui'),
     path("api/v1/integrations/kto/", include("integrations.kto.urls")),
     path("api/v1/integrations/youtube/", include("integrations.youtube.urls")),
-    path("api/v1/daenggle/", include("daenggle.urls")),
+    path("api/v1/daenggle", include("daenggle.urls")),
     path("api/v1/auth/", include("accounts.urls")),
     path("api/v1/pets/", include("pets.urls")),
     path("api/v1/members/", include("members.urls")),
