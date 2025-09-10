@@ -1,5 +1,6 @@
 from django.db import models
 from django.conf import settings
+from datetime import date
 
 class PetBreed(models.Model):
     code = models.SlugField(max_length=64, unique=True)
@@ -20,9 +21,10 @@ class PetBreed(models.Model):
 class PetProfile(models.Model):
 
     class Size(models.TextChoices):
-        SMALL = "SMALL", "소형"
-        MEDIUM = "MEDIUM", "중형"
-        LARGE = "LARGE", "대형"
+        SMALL = "SMALL", "소형견(10kg 미만)"
+        MEDIUM = "MEDIUM", "중형견(6~15kg)"
+        LARGE = "LARGE", "대형견(16~30kg)"
+        XLARGE="XLARGE", "초대형견(30kg 이상)"
 
 
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="dogs")
@@ -30,6 +32,8 @@ class PetProfile(models.Model):
     breed = models.ForeignKey(PetBreed, null=True, blank=True, on_delete=models.SET_NULL, related_name="dogs")
 
     size_code = models.CharField(max_length=10, choices=Size.choices)
+
+    birth_date = models.DateField(null=True, blank=True, help_text="생년월일(YYYY-MM-DD)")
 
     class Meta:
         db_table = "pets_dog_profile"
@@ -42,3 +46,11 @@ class PetProfile(models.Model):
 
     def __str__(self):
         return f"{self.name} / {self.user_id}"
+
+    @property
+    def age_years(self):
+        if not self.birth_date:
+            return None
+        today = date.today()
+        return max(0, today.year - self.birth_date.year -
+                   ((today.month, today.day) < (self.birth_date.month, self.birth_date.day)))

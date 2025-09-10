@@ -7,9 +7,11 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
+from django.shortcuts import get_object_or_404
+from rest_framework.permissions import IsAuthenticated
 
 from .models import PetBreed, PetProfile
-from .serializers import PetBreedReadSerializer, PetProfileWriteSerializer, PetProfileReadSerializer
+from .serializers import PetBreedReadSerializer, PetProfileWriteSerializer, PetProfileReadSerializer, PetProfilePatchSerializer
 from .breeds import PRESET_BREEDS
 
 class PetBreedInitView(APIView):
@@ -116,5 +118,61 @@ class PetProfileCreateView(APIView):
             name=v["name"],
             size_code=v["sizeCode"],
             breed=breed,
+            birth_date=v.get("birthDate"),
         )
         return Response(PetProfileReadSerializer(pet).data, status=status.HTTP_201_CREATED)
+
+class PetProfileView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @swagger_auto_schema(
+        operation_summary="반려견 프로필  조회",
+        operation_description="내 반려견 프로필을 조회합니다.",
+        tags=["Pets/Profiles"],
+        responses={
+            200: PetProfileReadSerializer,
+            404: openapi.Response("Not Found"),
+        },
+    )
+    def get(self, request, petId: int):
+        pet = get_object_or_404(
+            PetProfile.objects.select_related("breed"),
+            pk=petId, user=request.user
+        )
+        return Response(PetProfileReadSerializer(pet).data)
+
+class PetProfileUpdateView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @swagger_auto_schema(
+        operation_summary="반려견 프로필 수정",
+        operation_description="내 반려견 프로필을 부분 수정합니다.",
+        tags=["Pets/Profiles"],
+        request_body=PetProfilePatchSerializer,
+        responses={200: PetProfileReadSerializer},
+    )
+    def patch(self, request, petId: int):
+        pet = get_object_or_404(PetProfile, pk=petId, user=request.user)
+
+        s = PetProfilePatchSerializer(data=request.data, partial=True)
+        s.is_valid(raise_exception=True)
+        v = s.validated_data
+
+        if "name" in v:
+            pet.name = v["name"]
+        if "sizeCode" in v:
+            pet.size_code = v["sizeCode"]
+        if "breedId" in v:
+            breed = None
+            if v["breedId"] is not None:
+                breed = PetBreed.objects.filter(id=v["breedId"], is_active=True).first()
+                if not breed:
+                    return Response({"detail": "유효하지 않은 breedId 입니다."}, status=status.HTTP_400_BAD_REQUEST)
+            pet.breed = breed
+        if "birthDate" in v:
+            pet.birth_date = v["birthDate"]
+
+        pet.save()
+        return Response(PetProfileReadSerializer(pet).data)
+
+
