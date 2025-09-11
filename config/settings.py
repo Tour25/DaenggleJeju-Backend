@@ -151,7 +151,7 @@ SWAGGER_SETTINGS = {
             'in': 'header'
         }
     },
-    "DEFAULT_API_URL": "https://rumz.site",
+    "DEFAULT_API_URL": "https://daengglejeju.site",
 }
 
 # Password validation
