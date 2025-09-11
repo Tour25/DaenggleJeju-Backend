@@ -88,7 +88,9 @@ CORS_ALLOW_CREDENTIALS = True
 
 CORS_ALLOW_ORIGINS = [
     "http://localhost:5173",
-    "https://localhost:5173"
+    "https://localhost:5173",
+    "http://daengglejeju.site",
+    "https://daengglejeju.site",
 ]
 
 ROOT_URLCONF = 'config.urls'
