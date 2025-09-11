@@ -31,7 +31,7 @@ load_dotenv()
 SECRET_KEY = os.getenv("SECRET_KEY")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = False
 
 KTO_PET_API_KEY = os.getenv("KTO_PET_API_KEY")
 KTO_BASE_URL = os.getenv("KTO_BASE_URL")
