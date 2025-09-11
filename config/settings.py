@@ -93,6 +93,11 @@ CORS_ALLOW_ORIGINS = [
     "https://daengglejeju.site",
 ]
 
+CSRF_TRUSTED_ORIGINS = [
+    "https://daengglejeju.site",
+    "https://www.daengglejeju.site",
+]
+
 ROOT_URLCONF = 'config.urls'
 
 TEMPLATES = [
