@@ -29,23 +29,22 @@ services:
     ports:
       - "8000:8000"
     command: >
-      sh -c "sleep 200 && python manage.py makemigrations &&
+      sh -c "sleep 20 && python manage.py makemigrations &&
              python manage.py migrate &&
              python manage.py runserver 0.0.0.0:8000"
 
-  nginx:
-    image: nginx:1.27-alpine
-    depends_on:
-      - backend
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
-      - static_volume:/static
-      - media_volume:/media
-      - /etc/letsencrypt:/etc/letsencrypt:ro
-
+#  nginx:
+#    image: nginx:1.27-alpine
+#    depends_on:
+#      - backend
+#    ports:
+#      - "80:80"
+#      - "443:443"
+#    volumes:
+#      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+#      - static_volume:/static
+#      - media_volume:/media
+#      - /etc/letsencrypt:/etc/letsencrypt:ro
 volumes:
   mysql_data:
   static_volume:
