@@ -29,7 +29,7 @@ services:
     ports:
       - "8000:8000"
     command: >
-      sh -c "sleep 20 && python manage.py makemigrations &&
+      sh -c "sleep 60 && python manage.py makemigrations &&
              python manage.py migrate &&
              python manage.py runserver 0.0.0.0:8000"
 volumes:
