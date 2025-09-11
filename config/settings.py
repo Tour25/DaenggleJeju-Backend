@@ -43,7 +43,7 @@ YOUTUBE_RELEVANCE_LANG = os.getenv("YOUTUBE_RELEVANCE_LANG", "ko")
 KAKAO_REST_API_KEY = os.environ.get("KAKAO_REST_API_KEY")
 KAKAO_REDIRECT_URI = os.environ.get("KAKAO_REDIRECT_URI")
 
-ALLOWED_HOSTS = ["localhost", "0.0.0.0","127.0.0.1"]
+ALLOWED_HOSTS = ["localhost", "0.0.0.0","127.0.0.1", "daengglejeju.site", "www.daengglejeju.site"]
 
 SESSION_COOKIE_SAMESITE = "Lax"
 SESSION_COOKIE_HTTPONLY = True
