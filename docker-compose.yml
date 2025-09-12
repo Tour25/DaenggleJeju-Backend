@@ -6,6 +6,8 @@ services:
     command:
       - --character-set-server=utf8mb4
       - --collation-server=utf8mb4_unicode_ci
+    env_file:
+      - .env
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
       MYSQL_DATABASE: ${MYSQL_DATABASE}
@@ -13,25 +15,34 @@ services:
       MYSQL_PASSWORD: ${MYSQL_PASSWORD}
     ports:
       - "3307:3306"
-    env_file:
-      - .env
 
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-p${MYSQL_ROOT_PASSWORD}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+    volumes:
+      - mysql_data:/var/lib/mysql
 
   backend:
     build: .
     restart: always
-    depends_on:
-      - db
     env_file:
       - .env
+    depends_on:
+      db:
+        condition: service_healthy
     volumes:
       - .:/Backend
     ports:
       - "8000:8000"
-    command: >
-      sh -c "sleep 20 && python manage.py makemigrations &&
-             python manage.py migrate &&
-             python manage.py runserver 0.0.0.0:8000"
+    command: >                           
+      sh -c "
+        python manage.py makemigrations &&
+        python manage.py migrate --noinput &&
+        python manage.py runserver 0.0.0.0:8000
+      "
 
   nginx:
     image: nginx:1.27-alpine
@@ -45,9 +56,8 @@ services:
       - static_volume:/static
       - media_volume:/media
       - /etc/letsencrypt:/etc/letsencrypt:ro
+
 volumes:
   mysql_data:
   static_volume:
   media_volume:
-
-
