@@ -89,11 +89,15 @@ CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOW_ORIGINS = [
     "http://localhost:5173",
     "https://localhost:5173",
+    "http://localhost:3000",
+    "https://localhost:3000",
     "http://daengglejeju.site",
     "https://daengglejeju.site",
 ]
 
 CSRF_TRUSTED_ORIGINS = [
+    "http://localhost:3000",
+    "https://localhost:3000",
     "https://daengglejeju.site",
     "https://www.daengglejeju.site",
 ]
