@@ -22,14 +22,6 @@ class ScriptQuerySerializer(serializers.Serializer):
         help_text=f"칩(한글 그대로)\n{CHIP_DOC}",
     )
 
-    def validate(self, attrs):
-
-        try:
-            get_script(attrs["topic"], attrs["option"])
-        except KeyError:
-            raise serializers.ValidationError("unknown topic/option")
-        return attrs
-
 class MessageSerializer(serializers.Serializer):
     type = serializers.ChoiceField(choices=["script"])
     markdown = serializers.CharField()

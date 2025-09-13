@@ -10,6 +10,9 @@ from drf_yasg import openapi
 from django.shortcuts import get_object_or_404
 from rest_framework.permissions import IsAuthenticated
 
+from rest_framework.exceptions import ValidationError, NotFound
+from common.exceptions import AppError
+
 from .models import PetBreed, PetProfile
 from .serializers import PetBreedReadSerializer, PetProfileWriteSerializer, PetProfileReadSerializer, PetProfilePatchSerializer
 from .breeds import PRESET_BREEDS
@@ -73,6 +76,7 @@ class PetBreedSearchView(generics.ListAPIView):
         responses={200: PetBreedReadSerializer(many=True)},
     )
     def get(self, request, *args, **kwargs):
+        request._resp_message = "견종 검색 결과"
         return super().get(request, *args, **kwargs)
 
     def get_queryset(self):
@@ -96,6 +100,7 @@ class PetBreedSearchView(generics.ListAPIView):
 
 
 class PetProfileCreateView(APIView):
+    permission_classes = [IsAuthenticated]
 
     @swagger_auto_schema(
         operation_summary="반려견 프로필 저장",
@@ -112,6 +117,8 @@ class PetProfileCreateView(APIView):
         breed = None
         if v.get("breedId") is not None:
             breed = PetBreed.objects.filter(id=v["breedId"], is_active=True).first()
+            if not breed:
+                raise AppError("유효하지 않은 breedId 입니다.", status_code=400, code="BREED_INVALID")
 
         pet = PetProfile.objects.create(
             user=request.user,
@@ -120,6 +127,7 @@ class PetProfileCreateView(APIView):
             breed=breed,
             birth_date=v.get("birthDate"),
         )
+        request._resp_message = "반려견 프로필이 저장되었습니다."
         return Response(PetProfileReadSerializer(pet).data, status=status.HTTP_201_CREATED)
 
 class PetProfileView(APIView):
@@ -135,10 +143,14 @@ class PetProfileView(APIView):
         },
     )
     def get(self, request, petId: int):
-        pet = get_object_or_404(
-            PetProfile.objects.select_related("breed"),
-            pk=petId, user=request.user
-        )
+        try:
+            pet = (PetProfile.objects
+                   .select_related("breed")
+                   .get(pk=petId, user=request.user))
+        except PetProfile.DoesNotExist:
+            raise AppError("반려견 프로필을 찾을 수 없습니다.", status_code=404, code="PET_PROFILE_NOT_FOUND")
+
+        request._resp_message = "반려견 프로필 조회"
         return Response(PetProfileReadSerializer(pet).data)
 
 class PetProfileUpdateView(APIView):
@@ -167,12 +179,13 @@ class PetProfileUpdateView(APIView):
             if v["breedId"] is not None:
                 breed = PetBreed.objects.filter(id=v["breedId"], is_active=True).first()
                 if not breed:
-                    return Response({"detail": "유효하지 않은 breedId 입니다."}, status=status.HTTP_400_BAD_REQUEST)
+                    raise AppError("유효하지 않은 breedId 입니다.", status_code=400, code="BREED_INVALID")
             pet.breed = breed
         if "birthDate" in v:
             pet.birth_date = v["birthDate"]
 
         pet.save()
-        return Response(PetProfileReadSerializer(pet).data)
+        request._resp_message = "반려견 프로필이 수정되었습니다."
+        return Response(PetProfileReadSerializer(pet).data, status=status.HTTP_200_OK)
 
 
