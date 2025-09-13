@@ -7,6 +7,9 @@ from drf_yasg.utils import swagger_auto_schema
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from common.exceptions import AppError
+
+from rest_framework.exceptions import ValidationError
 
 from .models import Place, PlaceImage
 from .serializers import (
@@ -75,10 +78,8 @@ class PlaceMapAllView(APIView):
         try:
             min_lng, min_lat, max_lng, max_lat = parse_bbox(q["bbox"])
         except Exception:
-            return Response(
-                {"detail": "bbox must be 'minLng,minLat,maxLng,maxLat' format"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+            raise AppError("bbox는 'minLng,minLat,maxLng,maxLat' 형식이어야 합니다.",
+                           status_code=400, code="BBOX_INVALID")
 
         base = Place.objects.filter(
             mapx__isnull=False, mapy__isnull=False,
@@ -111,6 +112,7 @@ class PlaceMapAllView(APIView):
             "scrapCount": scrap_counts.get(p.pk, 0),
         } for p in rows]
 
+        request._resp_message = "지도용 장소 목록 조회"
         return Response({"total": len(items), "items": items})
 
 
@@ -185,6 +187,7 @@ class PlaceListView(APIView):
                 "scrapCount": scrap_counts.get(p.pk, 0),
             })
 
+        request._resp_message = "장소 목록 조회"
         return Response({"total": len(items), "items": items})
 
 
@@ -200,11 +203,13 @@ class PlaceDetailView(APIView):
         s.is_valid(raise_exception=True)
         q = s.validated_data
 
-        p = get_object_or_404(
-            Place.objects.prefetch_related(Prefetch("images", queryset=PlaceImage.objects.order_by("id")))
-                         .select_related("pet_policy"),
-            content_id=contentId,
-        )
+        try:
+            p = (Place.objects
+                 .prefetch_related(Prefetch("images", queryset=PlaceImage.objects.order_by("id")))
+                 .select_related("pet_policy")
+                 .get(content_id=contentId))
+        except Place.DoesNotExist:
+            raise AppError("장소를 찾을 수 없습니다.", status_code=404, code="PLACE_NOT_FOUND")
         policy = getattr(p, "pet_policy", None)
 
         dist_km: Optional[float] = None
@@ -226,6 +231,7 @@ class PlaceDetailView(APIView):
         if dist_km is not None:
             data["distanceText"] = f"{dist_km}km"
 
+        request._resp_message = "장소 단일 조회"
         return Response(data)
 
 
@@ -241,11 +247,13 @@ class PlaceDetailFullView(APIView):
         s.is_valid(raise_exception=True)
         q = s.validated_data
 
-        p = get_object_or_404(
-            Place.objects.prefetch_related(Prefetch("images", queryset=PlaceImage.objects.order_by("id")))
-                         .select_related("pet_policy"),
-            content_id=contentId,
-        )
+        try:
+            p = (Place.objects
+                 .prefetch_related(Prefetch("images", queryset=PlaceImage.objects.order_by("id")))
+                 .select_related("pet_policy")
+                 .get(content_id=contentId))
+        except Place.DoesNotExist:
+            raise AppError("장소를 찾을 수 없습니다.", status_code=404, code="PLACE_NOT_FOUND")
         policy = getattr(p, "pet_policy", None)
 
         images = [{"origin": img.origin, "thumb": img.thumb or None} for img in p.images.all()]
@@ -281,6 +289,7 @@ class PlaceDetailFullView(APIView):
         if dist_km is not None:
             data["distanceText"] = f"{dist_km}km"
 
+        request._resp_message = "장소 상세 조회"
         return Response(prune_empty(data))
 
 
@@ -303,7 +312,8 @@ class PlaceSearchView(APIView):
 
         terms = split_terms(q["q"])
         if not terms:
-            return Response({"detail": "검색어는 2글자 이상으로 입력해 주세요."}, status=400)
+            raise AppError("검색어는 2글자 이상으로 입력해 주세요.",
+                           status_code=400, code="QUERY_TOO_SHORT")
 
         qs = qs.filter(and_icontains(["title", "addr1", "overview", "pet_policy__etc_info"], terms))
 
@@ -375,4 +385,5 @@ class PlaceSearchView(APIView):
             }
             items.append(prune_empty(item))
 
+        request._resp_message = "장소 검색 결과"
         return Response({"total": len(items), "items": items})

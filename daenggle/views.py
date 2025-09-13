@@ -6,6 +6,9 @@ from django.db.models import Q, Subquery
 from rest_framework.permissions import IsAuthenticated
 from daenggle.models import DaenggleClip, DaenggleTag
 
+from rest_framework.exceptions import ValidationError
+from common.exceptions import AppError
+
 from daenggle.service.query import list_shorts
 from members.models import MemberPreference
 from daenggle.serializers import ShortsQuery, RegionShortsQuery, ConceptQuery
@@ -22,7 +25,8 @@ class ShortsListView(APIView):
         q = s.validated_data
 
         if q["type"] == "keyword" and not q.get("keyword"):
-            return Response({"detail": "keyword is required for type=keyword"}, status=400)
+            raise AppError("type=keyword 인 경우 keyword는 필수입니다.",
+                           status_code=400, code="KEYWORD_REQUIRED")
 
         res = list_shorts(
             q["type"],
@@ -34,6 +38,7 @@ class ShortsListView(APIView):
             offset=q["offset"],
             sort=q["sort"],
         )
+        request._resp_message = "섹션별 댕글 영상"
         return Response(res)
 
 
@@ -108,6 +113,7 @@ class RegionShortsView(APIView):
             "tags": c.tags or [],
         } for c in items]
 
+        request._resp_message = "지역/스타일 기반 댕글 영상"
         return Response({
             "items": data_items,
             "nextCursor": "",
@@ -220,4 +226,5 @@ class ConceptShortsView(APIView):
                 "items": items,
             })
 
+        request._resp_message = "컨셉별 영상 추천"
         return Response({"shelves": shelves})

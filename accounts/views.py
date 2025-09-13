@@ -13,7 +13,9 @@ from rest_framework.response import Response
 from drf_yasg.utils import swagger_auto_schema
 from .models import SocialAccount
 from rest_framework.permissions import IsAuthenticated
-import uuid
+from rest_framework import status
+from rest_framework.exceptions import ValidationError, NotFound
+from common.exceptions import AppError
 
 
 User = get_user_model()
@@ -61,19 +63,22 @@ class KakaoCallbackView(APIView):
         security=[],
     )
     def get(self, request):
-
         if request.GET.get("error"):
-            return Response({"detail": request.GET.get("error_description", "kakao error")}, status=400)
+            raise AppError(
+                request.GET.get("error_description", "kakao error"),
+                status_code=400,
+                code="OAUTH_PROVIDER_ERROR",
+            )
 
         state = request.GET.get("state")
         saved = request.session.get("kakao_oauth_state")
         if not state or not saved or state != saved:
-            return Response({"detail": "invalid state"}, status=400)
+            raise AppError("잘못된 state 값입니다.", status_code=400, code="OAUTH_STATE_INVALID")
         request.session.pop("kakao_oauth_state", None)
 
         code = request.GET.get("code")
         if not code:
-            return Response({"detail": "missing code"}, status=400)
+            raise AppError("code 파라미터가 없습니다.", status_code=400, code="OAUTH_CODE_MISSING")
 
         data = {
             "grant_type": "authorization_code",
@@ -94,8 +99,10 @@ class KakaoCallbackView(APIView):
             )
             token_res.raise_for_status()
             access_token = token_res.json()["access_token"]
-        except Exception as e:
-            return Response({"detail": f"token exchange failed: {e}"}, status=400)
+        except requests.RequestException as e:
+            raise AppError(f"카카오 토큰 교환 실패: {e}", status_code=502, code="KAKAO_TOKEN_ERROR")
+        except KeyError:
+            raise AppError("카카오 토큰 응답 파싱 실패", status_code=502, code="KAKAO_TOKEN_PARSE_ERROR")
 
         try:
             me_res = requests.get(
@@ -105,8 +112,10 @@ class KakaoCallbackView(APIView):
             )
             me_res.raise_for_status()
             kakao_id = str(me_res.json()["id"])
-        except Exception as e:
-            return Response({"detail": f"user info failed: {e}"}, status=400)
+        except requests.RequestException as e:
+            raise AppError(f"카카오 사용자 조회 실패: {e}", status_code=502, code="KAKAO_ME_ERROR")
+        except KeyError:
+            raise AppError("카카오 사용자 응답 파싱 실패", status_code=502, code="KAKAO_ME_PARSE_ERROR")
 
         is_new = False
         with transaction.atomic():
@@ -140,6 +149,7 @@ class MeView(APIView):
                          tags=["Auth"] )
     def get(self, request):
         handle = getattr(request.user, "handle", getattr(request.user, "username", None))
+        request._resp_message = "현재 로그인된 사용자"
         return Response({"id": request.user.id, "handle": handle})
 
 
@@ -162,7 +172,7 @@ class DevLoginView(APIView):
     )
     def post(self, request):
         if not settings.DEBUG:
-            return Response({"detail": "Not available in production."}, status=404)
+            raise AppError("Not available in production.", status_code=404, code="NOT_AVAILABLE_IN_PRODUCTION")
 
         User = get_user_model()
         user, _ = User.objects.get_or_create(
@@ -170,8 +180,8 @@ class DevLoginView(APIView):
             defaults={"is_active": True}
         )
         login(request, user, backend="django.contrib.auth.backends.ModelBackend")
-        return Response({"userId": user.id, "handle": user.handle}, status=200)
-
+        request._resp_message = "DEV 로그인 완료"
+        return Response({"userId": user.id, "handle": user.handle}, status=status.HTTP_200_OK)
 
 class DevLogoutView(APIView):
     permission_classes = [AllowAny]
@@ -185,4 +195,4 @@ class DevLogoutView(APIView):
     )
     def post(self, request):
         logout(request)
-        return Response(status=204)
+        return Response(status=status.HTTP_204_NO_CONTENT)

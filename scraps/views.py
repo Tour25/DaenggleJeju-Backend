@@ -6,6 +6,10 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from drf_yasg import openapi
+from rest_framework import status as S
+
+from rest_framework.exceptions import ValidationError, NotFound
+from common.exceptions import AppError
 
 from places.models import Place
 from places.constants import CONTENT_TYPE_LABELS, SIZE_KEYWORDS, AREA_KEYWORDS, AMENITY_KEYWORDS
@@ -119,7 +123,7 @@ class ScrapView(APIView):
             try:
                 place = Place.objects.get(content_id=obj_id)
             except Place.DoesNotExist:
-                return Response({"detail": "Not found."}, status=404)
+                raise AppError("장소를 찾을 수 없습니다.", status_code=404, code="PLACE_NOT_FOUND")
 
             ct = _ct_for(Place)
             with transaction.atomic():
@@ -128,22 +132,21 @@ class ScrapView(APIView):
                 )
                 if not created:
                     scrap.delete()
-                    return Response({"type": "place", "id": obj_id, "scraped": False, "message": "스크랩이 취소되었습니다"})
-                return Response({"type": "place", "id": obj_id, "scraped": True, "message": "스크랩되었습니다"})
+                    request._resp_message = "스크랩이 취소되었습니다"
+                    return Response({"type": "place", "id": obj_id, "scraped": False}, status=S.HTTP_200_OK)
+                request._resp_message = "스크랩되었습니다"
+                return Response({"type": "place", "id": obj_id, "scraped": True}, status=S.HTTP_201_CREATED)
 
 
         if t == "daenggle":
 
-            clip = None
-
             try:
                 clip = DaenggleClip.objects.get(video_id=str(obj_id))
             except DaenggleClip.DoesNotExist:
-
                 try:
                     clip = DaenggleClip.objects.get(pk=int(obj_id))
                 except (ValueError, DaenggleClip.DoesNotExist):
-                    return Response({"detail": "Not found."}, status=404)
+                    raise AppError("클립을 찾을 수 없습니다.", status_code=404, code="CLIP_NOT_FOUND")
 
             ct = _ct_for(DaenggleClip)
             with transaction.atomic():
@@ -152,14 +155,13 @@ class ScrapView(APIView):
                 )
                 if not created:
                     scrap.delete()
-                    return Response(
-                        {"type": "daenggle", "id": clip.video_id, "scraped": False, "message": "스크랩이 취소되었습니다"}
-                    )
-                return Response(
-                    {"type": "daenggle", "id": clip.video_id, "scraped": True, "message": "스크랩되었습니다"}
-                )
+                    request._resp_message = "스크랩이 취소되었습니다"
+                    return Response({"type": "daenggle", "id": clip.video_id, "scraped": False}, status=S.HTTP_200_OK)
+                request._resp_message = "스크랩되었습니다"
+                return Response({"type": "daenggle", "id": clip.video_id, "scraped": True}, status=S.HTTP_201_CREATED)
 
-        return Response({"detail": "unsupported type"}, status=400)
+        raise AppError("지원하지 않는 타입입니다. (type: place | daenggle)",
+                       status_code=400, code="SCRAP_TYPE_INVALID")
 
 
 class ScrapListView(APIView):
@@ -178,7 +180,7 @@ class ScrapListView(APIView):
 
         t = q["type"]
         if t not in ("place", "daenggle"):
-            return Response({"detail": "unsupported type"}, status=400)
+            raise ValidationError("지원하지 않는 타입입니다. (type: place | daenggle)")
 
         start = q.get("offset", 0)
         end = start + q.get("limit", 50)

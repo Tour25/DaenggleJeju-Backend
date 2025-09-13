@@ -7,6 +7,9 @@ from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
 from typing import Optional
 
+from common.exceptions import AppError
+from rest_framework import status
+
 from places.models import Place, PlaceImage
 from places.constants import CONTENT_TYPE_LABELS
 from .models import Footprint
@@ -84,7 +87,10 @@ class FootprintCreateView(APIView):
         s.is_valid(raise_exception=True)
         d = s.validated_data
 
-        place = get_object_or_404(Place, content_id=d["contentId"])
+        try:
+            place = Place.objects.get(content_id=d["contentId"])
+        except Place.DoesNotExist:
+            raise AppError("장소를 찾을 수 없습니다.", status_code=404, code="PLACE_NOT_FOUND")
 
         fp, created = Footprint.objects.update_or_create(
             user=request.user, place=place,
@@ -97,14 +103,10 @@ class FootprintCreateView(APIView):
             },
         )
 
+        request._resp_message = "발자국을 남겼어요" if created else "발자국을 업데이트했어요"
         return Response(
-            {
-                "footprintId": fp.id,
-                "contentId": place.content_id,
-                "created": created,
-                "message": "발자국을 남겼어요" if created else "발자국을 업데이트했어요",
-            },
-            status=201 if created else 200,
+            {"footprintId": fp.id, "contentId": place.content_id, "created": created},
+            status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
         )
 
 
@@ -131,6 +133,8 @@ class MyFootprintsListView(APIView):
         )
         if q.get("contentTypeId"):
             qs = qs.filter(place__content_type_id=q["contentTypeId"])
+
+        total = qs.count()
 
         start = q.get("offset", 0)
         end = start + q.get("limit", 20)
@@ -178,7 +182,8 @@ class MyFootprintsListView(APIView):
             }
             items.append(prune_empty(item))
 
-        return Response({"total": Footprint.objects.filter(user=request.user).count(), "items": items})
+        request._resp_message = "내 발자국 목록"
+        return Response({"total": total, "items": items})
 
 
 class PlaceFootprintsListView(APIView):
@@ -191,7 +196,10 @@ class PlaceFootprintsListView(APIView):
     )
     def get(self, request, contentId: int):
 
-        place = get_object_or_404(Place, content_id=contentId)
+        try:
+            place = Place.objects.get(content_id=contentId)
+        except Place.DoesNotExist:
+            raise AppError("장소를 찾을 수 없습니다.", status_code=404, code="PLACE_NOT_FOUND")
 
         s = PlaceFootprintListQuery(data=request.query_params)
         s.is_valid(raise_exception=True)
@@ -235,4 +243,5 @@ class PlaceFootprintsListView(APIView):
             }
             items.append(prune_empty(item))
 
+        request._resp_message = "장소별 발자국 목록"
         return Response({"total": total, "items": items})

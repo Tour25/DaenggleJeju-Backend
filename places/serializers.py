@@ -6,7 +6,7 @@ class PlaceMapAllQuery(serializers.Serializer):
     )
     contentTypeId = serializers.IntegerField(
         required=False,
-        help_text="32=숙박, 39=음식점, 12=관광지, 28=레포츠, 38=쇼핑"
+        help_text="32=숙박, 39=음식점, 12=관광지, 14=문화시설, 15=축제/공연/행사, 28=레포츠, 38=쇼핑"
     )
     limit = serializers.IntegerField(required=False, min_value=1, max_value=100, default=100)
 
@@ -41,7 +41,7 @@ class PlaceDetailQuery(serializers.Serializer):
 class PlaceListQuery(serializers.Serializer):
     contentTypeId = serializers.IntegerField(
         required=False,
-        help_text="32=숙박, 39=음식점, 12=관광지, 28=레포츠, 38=쇼핑"
+        help_text="32=숙박, 39=음식점, 12=관광지, 14=문화시설, 15=축제/공연/행사, 28=레포츠, 38=쇼핑"
     )
     limit = serializers.IntegerField(required=False, min_value=1, default=50)
     offset = serializers.IntegerField(required=False, min_value=0, default=0)
