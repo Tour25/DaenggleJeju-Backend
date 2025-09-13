@@ -70,6 +70,7 @@ INSTALLED_APPS = [
     "scraps",
     "footprints",
     "care",
+    "common",
 ]
 
 MIDDLEWARE = [
@@ -82,6 +83,15 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
+
+REST_FRAMEWORK = {
+
+    "DEFAULT_RENDERER_CLASSES": ["common.response.renderers.EnvelopedJSONRenderer"],
+    "EXCEPTION_HANDLER": "common.exceptions.exception_handler",
+
+    "DEFAULT_PAGINATION_CLASS": "common.response.pagination.EnvelopedPageNumberPagination",
+    "PAGE_SIZE": 20,
+}
 
 CORS_ALLOW_CREDENTIALS = True
 
