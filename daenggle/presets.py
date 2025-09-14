@@ -42,7 +42,7 @@ CURATION_TILES = [
         "hashtag": "#애월해안도로",
         "filters": {
             "place_context_ids": ["PLACE_aeweol"],
-            "keywords_any": ["애월 강아지 여행", "해안도로 강아지 여행", "애월 가아지 드라이브"],
+            "keywords_any": ["애월 강아지 여행", "해안도로 강아지 여행", "애월 강아지 드라이브"],
         },
     },
     {

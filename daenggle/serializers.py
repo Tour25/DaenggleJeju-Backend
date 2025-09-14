@@ -1,4 +1,8 @@
 from rest_framework import serializers
+from .presets import CURATION_TILES
+
+def _concept_key_choices():
+    return [(c["key"], c["title"]) for c in CURATION_TILES]
 
 class ShortsQuery(serializers.Serializer):
     type = serializers.ChoiceField(
@@ -38,12 +42,12 @@ class AccommodationShortsQuery(serializers.Serializer):
     limit = serializers.IntegerField(min_value=1, max_value=50, default=20)
     offset = serializers.IntegerField(min_value=0, default=0)
 
-
 class ConceptQuery(serializers.Serializer):
     conceptKeys = serializers.ListField(
-        child=serializers.CharField(),
-        required=False, default=[],
-        help_text="조회할 컨셉 key 배열. 비우면 모든 컨셉을 조회 (daenggle/presets.py의 CURATION_TILES 참조)"
+        child=serializers.ChoiceField(choices=_concept_key_choices()),
+        required=False,
+        default=[],
+        help_text="조회할 컨셉 key 배열. 비우면 모든 컨셉 조회"
     )
     limitPerConcept = serializers.IntegerField(
         min_value=1, max_value=20, default=8,
@@ -53,7 +57,20 @@ class ConceptQuery(serializers.Serializer):
     class Meta:
         swagger_schema_fields = {
             "example": {
-                "conceptKeys": ["water_activity", "aeweol_coastal_road"],
+                "conceptKeys": [CURATION_TILES[0]["key"], CURATION_TILES[1]["key"]],
                 "limitPerConcept": 8
             }
         }
+
+
+class ShortsSearchQuery(serializers.Serializer):
+    q = serializers.CharField(min_length=2, help_text="검색어 (공백/쉼표 구분, 최소 2자)")
+    sort = serializers.ChoiceField(choices=["rank", "recent", "views"], default="rank")
+    limit = serializers.IntegerField(min_value=1, max_value=50, default=20)
+    offset = serializers.IntegerField(min_value=0, default=0)
+
+
+class PlaceRecommendQuery(serializers.Serializer):
+    sort  = serializers.ChoiceField(choices=["rank", "recent", "views"], default="rank")
+    limit = serializers.IntegerField(min_value=1, max_value=50, default=20)
+    offset= serializers.IntegerField(min_value=0, default=0)
