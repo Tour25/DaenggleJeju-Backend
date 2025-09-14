@@ -10,6 +10,15 @@ from daenggle.presets import CURATION_TILES, REGION_NAME_BY_ID
 from daenggle.service.ingest import sync_keywords
 from daenggle.models import DaenggleClip, DaenggleTag
 
+def _tile_ctx_id(key: str) -> str:
+    return f"TILE_{key}"
+
+def _tile_saved_count(key: str) -> int:
+    return DaenggleTag.objects.filter(
+        category=DaenggleTag.Category.KEYWORD,
+        context_id=_tile_ctx_id(key),
+    ).count()
+
 
 class YouTubeSyncView(APIView):
     @swagger_auto_schema(
@@ -141,71 +150,82 @@ def _build_keywords_from_tile_filters(filters: dict):
             out.append(k)
     return out
 
-
 class TilePresetSyncView(APIView):
-
-    DEFAULT_DAYS = 30
+    DEFAULT_DAYS = 365
     DEFAULT_PAGES = 1
-    DEFAULT_MAX_DURATION = 120
+    DEFAULT_MAX_DURATION = 500
+
+    MIN_TARGET_PER_TILE = 8
+    MAX_TARGET_PER_TILE = 10
 
     @swagger_auto_schema(
         operation_summary="서버용: 타일 프리셋 영상 수집(바디 없음, 전체 타일 수집)",
-        operation_description=(
-            "presets.py의 CURATION_TILES 타일 별 댕글 영상을 저장합니다."),
+        operation_description="컨셉(타일)별로 영상을 수집합니다.",
         tags=["Integration/YouTube"],
-        request_body=None,  # ✅ 바디 없음
+        request_body=None,
     )
     def post(self, request):
         days = self.DEFAULT_DAYS
         pages = self.DEFAULT_PAGES
         max_dur = self.DEFAULT_MAX_DURATION
 
-        tiles = CURATION_TILES
-
         results = []
         total_found = 0
         total_saved = 0
 
-        for t in tiles:
-            filters = t.get("filters") or {}
-            keywords = _build_keywords_from_tile_filters(filters)
+        for t in CURATION_TILES:
+            key = t["key"]
+            title = t["title"]
+            ctx_id = _tile_ctx_id(key)
 
-            res = sync_keywords(
-                keywords,
-                days=days,
-                pages=pages,
-                max_duration_seconds=max_dur,
-                category=DaenggleTag.Category.KEYWORD,
-                context_id=f"TILE_{t['key']}",
-                context_name=t["title"],
-            )
+            keywords = _build_keywords_from_tile_filters(t.get("filters") or {})
 
-            found = res.get("totalFound", 0)
-            saved = res.get("totalSaved", 0)
-            total_found += found
-            total_saved += saved
+            saved_now = _tile_saved_count(key)
+            runs = []
 
-            results.append(
-                {
-                    "key": t["key"],
-                    "title": t["title"],
-                    "found": found,
-                    "saved": saved,
-                    "keywordsUsed": keywords,
-                    "limits": {"days": days, "pages": pages, "maxDuration": max_dur},
-                }
-            )
+            for kw in keywords:
 
-        return Response(
-            {
-                "summary": {
-                    "totalFound": total_found,
-                    "totalSaved": total_saved,
-                    "tiles": len(tiles),
-                    "forcedAll": True,
-                    "defaults": {"days": days, "pages": pages, "maxDuration": max_dur},
-                },
-                "results": results,
+                if saved_now >= self.MAX_TARGET_PER_TILE:
+                    break
+
+                res = sync_keywords(
+                    [kw],
+                    days=days,
+                    pages=pages,
+                    max_duration_seconds=max_dur,
+                    category=DaenggleTag.Category.KEYWORD,
+                    context_id=ctx_id,
+                    context_name=title,
+                )
+
+                found = int(res.get("totalFound", 0))
+                saved = int(res.get("totalSaved", 0))
+                total_found += found
+                total_saved += saved
+                runs.append({"keyword": kw, "found": found, "saved": saved})
+
+                saved_now = _tile_saved_count(key)
+
+            results.append({
+                "key": key,
+                "title": title,
+                "minTarget": self.MIN_TARGET_PER_TILE,
+                "maxTarget": self.MAX_TARGET_PER_TILE,
+                "targetPerTile": self.MIN_TARGET_PER_TILE,  # (하위호환용 필드)
+                "savedNow": saved_now,
+                "keywordsUsed": keywords,
+                "runs": runs,
+                "limits": {"days": days, "pages": pages, "maxDuration": max_dur},
+            })
+
+        return Response({
+            "summary": {
+                "totalFound": total_found,
+                "totalSaved": total_saved,
+                "tiles": len(CURATION_TILES),
+                "minTargetPerTile": self.MIN_TARGET_PER_TILE,
+                "maxTargetPerTile": self.MAX_TARGET_PER_TILE,
+                "targetPerTile": self.MIN_TARGET_PER_TILE,
             },
-            status=status.HTTP_200_OK,
-        )
+            "results": results,
+        }, status=status.HTTP_200_OK)
