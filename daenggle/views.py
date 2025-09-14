@@ -1,45 +1,208 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from drf_yasg.utils import swagger_auto_schema
+from django.utils import timezone
+
+from django.db.models import Count
+from django.contrib.contenttypes.models import ContentType
+from scraps.models import Scrap
 
 from django.db.models import Q, Subquery
 from rest_framework.permissions import IsAuthenticated
 from daenggle.models import DaenggleClip, DaenggleTag
 
-from rest_framework.exceptions import ValidationError
-from common.exceptions import AppError
-
-from daenggle.service.query import list_shorts
 from members.models import MemberPreference
-from daenggle.serializers import ShortsQuery, RegionShortsQuery, ConceptQuery
-from daenggle.presets import CURATION_TILES as CONCEPT_PRESETS, REGION_NAME_BY_ID
+from .serializers import RegionShortsQuery, ConceptQuery, TrendingShortsQuery, AccommodationShortsQuery
+from .presets import CURATION_TILES as CONCEPT_PRESETS, REGION_NAME_BY_ID
 
-class ShortsListView(APIView):
-    @swagger_auto_schema(operation_summary="섹션별 댕글 영상 조회",
-                         operation_description="섹션(장소/숙소/트렌드)별 댕글 영상 목록을 조회합니다.",
-                         tags=["Daenggle"],
-                         query_serializer=ShortsQuery)
-    def get(self, request):
-        s = ShortsQuery(data=request.query_params)
-        s.is_valid(raise_exception=True)
-        q = s.validated_data
+def _order_by(sort: str):
+    if sort == "views":
+        return ["-view_count", "-id"]
+    if sort == "recent":
+        return ["-published_at", "-id"]
+    return ["-published_at", "-view_count", "-id"]
 
-        if q["type"] == "keyword" and not q.get("keyword"):
-            raise AppError("type=keyword 인 경우 keyword는 필수입니다.",
-                           status_code=400, code="KEYWORD_REQUIRED")
+def _fmt_yymmdd(dt):
+    if not dt:
+        return None
+    return timezone.localtime(dt).strftime("%y-%m-%d")
 
-        res = list_shorts(
-            q["type"],
-            context_id=q.get("contextId") or None,
-            keyword=q.get("keyword") or None,
-            days=q.get("days"),
-            max_duration=q.get("maxDuration"),
-            limit=q["limit"],
-            offset=q["offset"],
-            sort=q["sort"],
+def _scrap_maps_for_clips(user, clip_pk_list):
+    if not clip_pk_list:
+        return {}, set()
+    ct = ContentType.objects.get_for_model(DaenggleClip)
+
+    counts = (Scrap.objects
+              .filter(content_type=ct, object_id__in=clip_pk_list)
+              .values("object_id").annotate(cnt=Count("id")))
+    scrap_count_map = {r["object_id"]: r["cnt"] for r in counts}
+
+    user_scrapped_set = set()
+    if getattr(user, "is_authenticated", False):
+        user_scrapped_set = set(
+            Scrap.objects.filter(user=user, content_type=ct, object_id__in=clip_pk_list)
+                         .values_list("object_id", flat=True)
         )
-        request._resp_message = "섹션별 댕글 영상"
-        return Response(res)
+    return scrap_count_map, user_scrapped_set
+
+
+class AccommodationShortsView(APIView):
+    @swagger_auto_schema(
+        operation_summary="숙소 댕글 영상 조회",
+        operation_description="ACCOMMODATION 태그 기반. contextId를 주면 해당 숙소, 비우면 숙소 전체 추천.",
+        tags=["Daenggle"],
+        query_serializer=AccommodationShortsQuery,
+    )
+    def get(self, request):
+        s = AccommodationShortsQuery(data=request.query_params)
+        s.is_valid(raise_exception=True)
+        d = s.validated_data
+
+        tag_qs = DaenggleTag.objects.filter(category=DaenggleTag.Category.ACCOMMODATION)
+
+        clip_ids_sub = tag_qs.values("clip_id")
+        qs = DaenggleClip.objects.filter(id__in=Subquery(clip_ids_sub))
+
+        qs = qs.order_by(*_order_by(d["sort"]))
+        limit, offset = d["limit"], d["offset"]
+        rows = list(qs[offset: offset + limit + 1])
+        items = rows[:limit]
+        has_more = len(rows) > len(items)
+
+        clip_pk_list = [c.id for c in items]
+        scrap_count_map, user_scrapped_set = _scrap_maps_for_clips(request.user, clip_pk_list)
+
+        data_items = [{
+            "video_id": c.video_id,
+            "title": c.title,
+            "authorName": c.channel_title,
+            "playbackUrl": f"https://www.youtube.com/watch?v={c.video_id}",
+            "loveCount": (c.like_count or 0),
+            "caption": (c.description or "")[:140],
+            "published_at": _fmt_yymmdd(c.published_at),
+            "isScrapped": (c.id in user_scrapped_set),
+            "scrapCount": scrap_count_map.get(c.id, 0),
+        } for c in items]
+
+        request._resp_message = "숙소 댕글 영상"
+        return Response({
+            "items": data_items,
+            "nextCursor": "",
+            "hasMore": has_more,
+        })
+
+class RegionPlainShortsView(APIView):
+    @swagger_auto_schema(
+        operation_summary="지역별 댕글 영상 조회",
+        operation_description="PLACE 태그 기반으로 지역 별 댕글 영상을 조회합니다.",
+        tags=["Daenggle"],
+        query_serializer=RegionShortsQuery,
+    )
+    def get(self, request):
+        q = RegionShortsQuery(data=request.query_params)
+        q.is_valid(raise_exception=True)
+        d = q.validated_data
+
+        clip_ids_sub = DaenggleTag.objects.filter(
+            category=DaenggleTag.Category.PLACE,
+            context_id=d["contextId"],
+        ).values("clip_id")
+
+        qs = DaenggleClip.objects.filter(id__in=Subquery(clip_ids_sub))
+
+        exclude_ids = d.get("excludeIds") or []
+        if exclude_ids:
+            qs = qs.exclude(video_id__in=list(set(exclude_ids)))
+
+        sort = d["sort"]
+        if sort == "recent":
+            qs = qs.order_by("-published_at", "-id")
+        elif sort == "views":
+            qs = qs.order_by("-view_count", "-id")
+        else:
+            qs = qs.order_by("-published_at", "-view_count", "-id")
+
+        limit = d["limit"]; offset = d["offset"]
+        rows = list(qs[offset: offset + limit + 1])
+        items = rows[:limit]
+        has_more = len(rows) > len(items)
+
+        place_pill = DaenggleTag.objects.filter(
+            category=DaenggleTag.Category.PLACE,
+            context_id=d["contextId"],
+        ).values_list("context_name", flat=True).first()
+
+        clip_pk_list = [c.id for c in items]
+        scrap_count_map, user_scrapped_set = _scrap_maps_for_clips(request.user, clip_pk_list)
+
+        data_items = [{
+            "video_id": c.video_id,
+            "title": c.title,
+            "authorName": c.channel_title,
+            "playbackUrl": f"https://www.youtube.com/watch?v={c.video_id}",
+            "placePill": place_pill,
+            "caption": (c.description or "")[:140],
+            "published_at": _fmt_yymmdd(c.published_at),
+            "isScrapped": (c.id in user_scrapped_set),
+            "scrapCount": scrap_count_map.get(c.id, 0),
+            "tags": c.tags or [],
+        } for c in items]
+
+        request._resp_message = "지역별 댕글 영상 조회"
+        return Response({
+            "items": data_items,
+            "nextCursor": "",
+            "hasMore": has_more,
+        })
+
+
+class TrendingShortsView(APIView):
+    @swagger_auto_schema(
+        operation_summary="트렌딩(조회수 높은) 댕글 영상",
+        operation_description="TREND 태그 기반. days로 최근 N일 제한 가능.",
+        tags=["Daenggle"],
+        query_serializer=TrendingShortsQuery,
+    )
+    def get(self, request):
+        s = TrendingShortsQuery(data=request.query_params)
+        s.is_valid(raise_exception=True)
+        d = s.validated_data
+
+
+        clip_ids_sub = DaenggleTag.objects.filter(
+            category=DaenggleTag.Category.TREND
+        ).values("clip_id")
+
+        qs = DaenggleClip.objects.filter(id__in=Subquery(clip_ids_sub))
+
+        qs = qs.order_by(*_order_by(d["sort"]))
+        limit, offset = d["limit"], d["offset"]
+        rows = list(qs[offset: offset + limit + 1])
+        items = rows[:limit]
+        has_more = len(rows) > len(items)
+
+        clip_pk_list = [c.id for c in items]
+        scrap_count_map, user_scrapped_set = _scrap_maps_for_clips(request.user, clip_pk_list)
+
+        data_items = [{
+            "video_id": c.video_id,
+            "title": c.title,
+            "authorName": c.channel_title,
+            "playbackUrl": f"https://www.youtube.com/watch?v={c.video_id}",
+            "caption": (c.description or "")[:140],
+            "published_at": _fmt_yymmdd(c.published_at),
+            "isScrapped": (c.id in user_scrapped_set),
+            "scrapCount": scrap_count_map.get(c.id, 0),
+            "tags": c.tags or [],
+        } for c in items]
+
+        request._resp_message = "조회수 탑 10 댕글 영상"
+        return Response({
+            "items": data_items,
+            "nextCursor": "",
+            "hasMore": has_more,
+        })
+
 
 
 class RegionShortsView(APIView):
@@ -96,24 +259,27 @@ class RegionShortsView(APIView):
         items = rows[:limit]
         has_more = len(rows) > len(items)
 
+        clip_pk_list = [c.id for c in items]
+        scrap_count_map, user_scrapped_set = _scrap_maps_for_clips(request.user, clip_pk_list)
 
         data_items = [{
             "video_id": c.video_id,
             "title": c.title,
             "authorName": c.channel_title,
-            "thumbnails": c.thumbnails,
             "styles": c.styles or [],
             "playbackUrl": f"https://www.youtube.com/watch?v={c.video_id}",
             "placePill": DaenggleTag.objects.filter(
                 clip=c, category=DaenggleTag.Category.PLACE, context_id=d["contextId"]
             ).values_list("context_name", flat=True).first() or None,
             "caption": (c.description or "")[:140],
-            "published_at": c.published_at,
+            "published_at": _fmt_yymmdd(c.published_at),
+            "isScrapped": (c.id in user_scrapped_set),
+            "scrapCount": scrap_count_map.get(c.id, 0),
             "duration_seconds": c.duration_seconds,
             "tags": c.tags or [],
         } for c in items]
 
-        request._resp_message = "지역/스타일 기반 댕글 영상"
+        request._resp_message = "지역별 사용자 스타일 기반 댕글 영상"
         return Response({
             "items": data_items,
             "nextCursor": "",
