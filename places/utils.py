@@ -3,10 +3,11 @@ from operator import or_
 from typing import Optional, Tuple, List, Dict
 from math import radians, sin, cos, asin, sqrt
 import re
+import json
+import ast
+
 from django.db.models import Q
 
-
-from django.db.models import Q
 from .constants import (
     CONTENT_TYPE_LABELS,
     SIZE_KEYWORDS,
@@ -33,6 +34,129 @@ AMENITY_TOKEN_TO_LABEL = {
     "pets_zone": "애견 전용 공간",
     "jacuzzi": "자쿠지",
 }
+
+
+_CHIP_SYNONYMS = {
+    # 조건/규정
+    "목줄착용": "목줄착용", "목줄 착용": "목줄착용", "leash": "목줄착용",
+    "입마개착용": "입마개착용", "입마개 착용": "입마개착용",
+    "이동장사용": "이동장사용", "이동 장 사용": "이동장사용", "캐리어": "이동장사용", "carrier": "이동장사용",
+    "유모차탑승": "유모차탑승", "반려동물유모차": "유모차탑승",
+    "매너벨트착용": "매너벨트착용", "매너 벨트 착용": "매너벨트착용",
+    "하네스": "하네스",
+    "산책만": "산책만",
+
+    # 크기
+    "소형": "소형견", "소형견": "소형견",
+    "중형": "중형견", "중형견": "중형견",
+    "대형": "대형견", "대형견": "대형견",
+    "초대형": "초대형",
+    "모든크기": "모든크기", "모든 크기": "모든크기",
+
+    # 구역/공간
+    "실내": "실내", "실외": "야외", "야외": "야외",
+    "실내일부": "실내일부", "실외일부": "실외일부",
+    "모든구역": "모든구역", "모든 구역": "모든구역",
+    "야외풀": "야외풀", "야외 수영장": "야외풀",
+
+    # 편의시설/속성
+    "와이파이": "와이파이", "wifi": "와이파이", "무선인터넷": "와이파이",
+    "바베큐": "바베큐", "bbq": "바베큐", "barbecue": "바베큐",
+    "마당": "마당", "yard": "마당",
+    "애견전용공간": "애견 전용 공간", "애견 전용 공간": "애견 전용 공간", "펫존": "애견 전용 공간", "pets_zone": "애견 전용 공간",
+    "자쿠지": "자쿠지", "jacuzzi": "자쿠지",
+    "독채숙소": "독채숙소",
+    "애견동반": "애견동반",
+
+    # 기타
+    "주차가능": "주차가능", "주차 가능": "주차가능",
+}
+
+def _norm_chip(s: str) -> str:
+
+    t = (s or "").strip()
+    if not t:
+        return t
+
+    t = re.sub(r"^[#•\-\*]+\s*", "", t)
+
+    t = t.strip()
+
+    low = t.lower()
+    if low in _CHIP_SYNONYMS:
+        return _CHIP_SYNONYMS[low]
+
+    return _CHIP_SYNONYMS.get(t, t)
+
+def _safe_json_loads(s: str):
+
+    try:
+        return json.loads(s)
+    except Exception:
+        try:
+            return ast.literal_eval(s)
+        except Exception:
+            return None
+
+def parse_policy_chips(policy) -> List[str]:
+
+    if not policy:
+        return []
+
+    out: List[str] = []
+
+    raw = getattr(policy, "chips", None)
+    if raw:
+        if isinstance(raw, list):
+            out += raw
+        elif isinstance(raw, dict):
+            out += raw.get("chips") or []
+        elif isinstance(raw, str):
+            j = _safe_json_loads(raw)
+            if isinstance(j, list):
+                out += j
+            elif isinstance(j, dict) and "chips" in j:
+                out += j.get("chips") or []
+            else:
+                out += re.split(r"[,/|\n]+", raw)
+
+    txt = (getattr(policy, "etc_info", "") or "").strip()
+    if txt:
+
+        j = _safe_json_loads(txt)
+        if isinstance(j, dict) and "chips" in j:
+            out += j.get("chips") or []
+        elif isinstance(j, list):
+            out += j
+        else:
+            # "chips: a, b, c" 또는 "[chips] a, b"
+            m = re.search(r"(?:^\s*(?:chips|칩|태그)\s*:\s*)(.+)$", txt, re.IGNORECASE | re.MULTILINE)
+            if m:
+                out += re.split(r"[,/|]+", m.group(1))
+            for mm in re.finditer(r"\[?\s*chips\s*\]?\s*([^\n]+)", txt, re.IGNORECASE):
+                out += re.split(r"[,/|]+", mm.group(1))
+            # 해시태그
+            out += [h for h in re.findall(r"#([^\s,#]+)", txt)]
+
+    # 정규화 + 중복 제거(순서 보존)
+    normed = [_norm_chip(c) for c in out if c and str(c).strip()]
+    seen = set()
+    uniq: List[str] = []
+    for c in normed:
+        if c not in seen:
+            seen.add(c)
+            uniq.append(c)
+    return uniq
+
+def merge_chips(primary: List[str], secondary: List[str], max_len: Optional[int] = None) -> List[str]:
+
+    seen = set(primary)
+    merged = list(primary)
+    for c in secondary:
+        if c not in seen:
+            seen.add(c)
+            merged.append(c)
+    return merged[:max_len] if max_len else merged
 
 def parse_bbox(bbox_str: str) -> Tuple[float, float, float, float]:
     parts = [p.strip() for p in bbox_str.split(",")]
@@ -109,7 +233,6 @@ def address_brief(addr: Optional[str]) -> str:
     if not addr:
         return "정보없음"
     parts = addr.split()
-
     if len(parts) >= 3 and parts[1].endswith("시"):
         return f"{parts[1]} {parts[2]}"
     return " ".join(parts[:2]) if len(parts) >= 2 else parts[0]
@@ -139,7 +262,6 @@ def find_labels(text: str, mapping: Dict[str, List[str]]) -> List[str]:
     return list(dict.fromkeys(out))
 
 def place_type_label(place) -> Optional[str]:
-
     if place.content_type_id != 32:
         return None
     txt = (place.title or "") + " " + (place.overview or "")
@@ -157,12 +279,11 @@ def tokens_to_terms(tokens: List[str], token_map: Dict[str, str], dict_map: Dict
     return out
 
 def build_filter_q(query) -> Q:
-
     q = Q()
 
+    # sizes
     sizes = set(query.get("sizes") or [])
     if sizes and "all" not in sizes:
-
         size_code_map = {"small": "01", "med": "02", "large": "03", "xlarge": "04"}
         codes = [size_code_map[s] for s in sizes if s in size_code_map]
         if codes:
@@ -197,7 +318,6 @@ def build_filter_q(query) -> Q:
     return q
 
 def split_terms(qstr: str) -> List[str]:
-
     if not qstr:
         return []
     tokens = re.split(r"[\s,]+", str(qstr).strip())

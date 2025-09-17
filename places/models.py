@@ -65,8 +65,8 @@ class Place(TimeStamped):
 
 class PlaceImage(TimeStamped):
     place = models.ForeignKey(Place, on_delete=models.CASCADE, related_name="images")
-    origin = models.URLField()
-    thumb = models.URLField(blank=True, null=True)
+    origin = models.URLField(max_length=512)
+    thumb = models.URLField(max_length=512, blank=True, null=True)
 
     class Meta:
         unique_together = ("place", "origin")

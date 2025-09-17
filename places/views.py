@@ -1,15 +1,15 @@
 from typing import Optional
 
 from django.db.models import Prefetch, Case, When, Value, IntegerField, Count
-from django.shortcuts import get_object_or_404
 from django.contrib.contenttypes.models import ContentType
 from drf_yasg.utils import swagger_auto_schema
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from common.exceptions import AppError
+import json, re
 
-from rest_framework.exceptions import ValidationError
+from .ingest import ingest_hardcoded
 
 from .models import Place, PlaceImage
 from .serializers import (
@@ -22,6 +22,7 @@ from .utils import (
     haversine_km, address_brief, thumb_or_text, collect_text,
     find_labels, place_type_label, build_filter_q,
     split_terms, and_icontains,
+    parse_policy_chips, merge_chips,
 )
 from scraps.models import Scrap
 
@@ -36,7 +37,6 @@ def _scrapped_pk_set(user, places):
         Scrap.objects.filter(user=user, content_type=ct, object_id__in=pks)
                      .values_list("object_id", flat=True)
     )
-
 
 def _scrapped_bool(user, place: Place) -> bool:
     if not (user and user.is_authenticated):
@@ -61,6 +61,42 @@ def _scrap_count_for_place(place: Place) -> int:
     ct = ContentType.objects.get_for_model(Place)
     return Scrap.objects.filter(content_type=ct, object_id=place.pk).count()
 
+def _extract_policy_chips(policy):
+    chips = getattr(policy, "chips", None)
+    if not chips:
+        return []
+    if isinstance(chips, str):
+        try:
+            data = json.loads(chips)
+            if isinstance(data, list):
+                return [str(x).strip() for x in data if str(x).strip()]
+        except Exception:
+            return [c for c in re.split(r"[,\\n]+", chips) if c.strip()]
+    if isinstance(chips, (list, tuple)):
+        return [str(x).strip() for x in chips if str(x).strip()]
+    return []
+
+def _extract_policy_notes(policy):
+    raw = (getattr(policy, "etc_info", "") or "").strip()
+    if not raw:
+        return []
+    try:
+        obj = json.loads(raw)
+        if isinstance(obj, dict):
+            base = obj.get("_raw") or obj.get("raw") or ""
+            return [s for s in re.split(r"[\\n]+", str(base)) if s.strip()]
+        if isinstance(obj, list):
+
+            return [str(x).strip() for x in obj if str(x).strip()]
+    except Exception:
+        pass
+
+    cleaned = re.sub(r'"chips"\s*:\s*\[[^\]]*\]\s*,?', "", raw)
+    cleaned = re.sub(r'^\{|\}$', "", cleaned)
+    cleaned = re.sub(r'"?_raw"?\s*:\s*', "", cleaned).strip()
+    cleaned = cleaned.strip('"')
+
+    return [s for s in re.split(r"[\\n]+", cleaned) if s.strip()]
 
 class PlaceMapAllView(APIView):
     @swagger_auto_schema(
@@ -115,7 +151,6 @@ class PlaceMapAllView(APIView):
         request._resp_message = "지도용 장소 목록 조회"
         return Response({"total": len(items), "items": items})
 
-
 class PlaceListView(APIView):
     @swagger_auto_schema(
         operation_summary="장소 전체 목록 조회 - 리스트",
@@ -161,11 +196,14 @@ class PlaceListView(APIView):
             amens = find_labels(src, AMENITY_KEYWORDS)
             cond = conditions_text(policy)
 
-            chips = []
-            if sizes: chips.append(sizes[0])
-            if areas: chips.append(areas[0])
-            if cond and cond != "정보없음": chips.append(cond)
-            if amens: chips.append(amens[0])
+            algo_chips = []
+            if sizes: algo_chips.append(sizes[0])
+            if areas: algo_chips.append(areas[0])
+            if cond and cond != "정보없음": algo_chips.append(cond)
+            if amens: algo_chips.append(amens[0])
+
+            policy_chips = parse_policy_chips(policy)
+            chips = merge_chips(policy_chips, algo_chips, max_len=4)
 
             meta_line = f"{address_brief(p.addr1)} · {place_type_label(p) or ''}".rstrip(" ·")
 
@@ -189,7 +227,6 @@ class PlaceListView(APIView):
 
         request._resp_message = "장소 목록 조회"
         return Response({"total": len(items), "items": items})
-
 
 class PlaceDetailView(APIView):
     @swagger_auto_schema(
@@ -234,7 +271,6 @@ class PlaceDetailView(APIView):
         request._resp_message = "장소 단일 조회"
         return Response(data)
 
-
 class PlaceDetailFullView(APIView):
     @swagger_auto_schema(
         operation_summary="장소 상세 조회",
@@ -264,6 +300,7 @@ class PlaceDetailFullView(APIView):
             "areas": find_labels(src, AREA_KEYWORDS),
             "conditions": conditions_text(policy),
             "amenities": find_labels(src, AMENITY_KEYWORDS),
+            "policy": parse_policy_chips(policy),
         }
 
         data = {
@@ -277,7 +314,7 @@ class PlaceDetailFullView(APIView):
             "chips": chips,
             "petPolicy": {
                 "acmpyTypeCd": text_or_unknown(getattr(policy, "acmpy_type_cd", None)),
-                "notes": split_lines(getattr(policy, "etc_info", "")),
+                "notes": _extract_policy_notes(policy),
             },
             "isScrapped": _scrapped_bool(request.user, p),
             "scrapCount": _scrap_count_for_place(p),
@@ -291,7 +328,6 @@ class PlaceDetailFullView(APIView):
 
         request._resp_message = "장소 상세 조회"
         return Response(prune_empty(data))
-
 
 class PlaceSearchView(APIView):
     @swagger_auto_schema(
@@ -356,13 +392,16 @@ class PlaceSearchView(APIView):
             amens = find_labels(src, AMENITY_KEYWORDS)
             cond = conditions_text(policy)
 
-            chips_list = []
-            if sizes: chips_list.append(sizes[0])
-            if areas: chips_list.append(areas[0])
-            if cond and cond != "정보없음": chips_list.append(cond)
-            if amens: chips_list.append(amens[0])
+            algo_chips = []
+            if sizes: algo_chips.append(sizes[0])
+            if areas: algo_chips.append(areas[0])
+            if cond and cond != "정보없음": algo_chips.append(cond)
+            if amens: algo_chips.append(amens[0])
 
-            chips_value = chips_list[0] if len(chips_list) == 1 else chips_list
+            policy_chips = parse_policy_chips(policy)
+            merged_chips = merge_chips(policy_chips, algo_chips, max_len=4)
+
+            chips_value = merged_chips[0] if len(merged_chips) == 1 else merged_chips
 
             meta_line = f"{address_brief(p.addr1)} · {place_type_label(p) or ''}".rstrip(" ·")
 
@@ -381,9 +420,24 @@ class PlaceSearchView(APIView):
                 "thumbnail": thumb_or_text(p),
                 "chips": chips_value,
                 "isScrapped": (p.pk in scraped_set),
-                "scrapCount": _scrap_count_for_place(p),
+                "scrapCount": scrap_counts,
             }
             items.append(prune_empty(item))
 
         request._resp_message = "장소 검색 결과"
         return Response({"total": len(items), "items": items})
+
+class LoadHardcodedView(APIView):
+    @swagger_auto_schema(
+        operation_summary="서버용: 장소 추가 데이터 저장",
+        operation_description="장소 추가 데이터를 저장합니다.",
+        tags=["Places"]
+    )
+    def post(self, request, *args, **kwargs):
+        allow_data = str(request.query_params.get("allow_data_urls", "1")).lower() not in {"0", "false", "no"}
+        try:
+            ingest_hardcoded(dry_run=False, allow_data_urls=allow_data)
+        except Exception as e:
+            return Response({"message": "추가 데이터 저장 실패", "error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        return Response({"message": "추가 데이터 저장 성공"}, status=status.HTTP_200_OK)
