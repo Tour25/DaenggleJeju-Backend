@@ -137,19 +137,56 @@ class PlaceMapAllView(APIView):
         scraped_set = _scrapped_pk_set(request.user, rows)
         scrap_counts = _scrap_counts_for_places(rows)
 
-        items = [{
-            "contentId": p.content_id,
-            "contentType": {"id": p.content_type_id, "name": CONTENT_TYPE_LABELS.get(p.content_type_id, "기타")},
-            "title": p.title,
-            "lat": p.mapy,
-            "lng": p.mapx,
-            "thumbnail": (p.images.first().thumb or p.images.first().origin) if p.images.first() else None,
-            "isScrapped": (p.pk in scraped_set),
-            "scrapCount": scrap_counts.get(p.pk, 0),
-        } for p in rows]
+        user_lat = q.get("userLat")
+        user_lng = q.get("userLng")
+
+        items = []
+        for p in rows:
+            policy = getattr(p, "pet_policy", None)
+
+            src = collect_text(p)
+            sizes = find_labels(src, SIZE_KEYWORDS)
+            areas = find_labels(src, AREA_KEYWORDS)
+            amens = find_labels(src, AMENITY_KEYWORDS)
+            cond = conditions_text(policy)
+
+            algo_chips = []
+            if sizes: algo_chips.append(sizes[0])
+            if areas: algo_chips.append(areas[0])
+            if cond and cond != "정보없음": algo_chips.append(cond)
+            if amens: algo_chips.append(amens[0])
+
+            policy_chips = parse_policy_chips(policy)
+            chips = merge_chips(policy_chips, algo_chips, max_len=4)
+
+            meta_line = f"{address_brief(p.addr1)} · {place_type_label(p) or ''}".rstrip(" ·")
+
+            dist_text = None
+            if user_lat is not None and user_lng is not None:
+                d = haversine_km(user_lat, user_lng, p.mapy, p.mapx)
+                if d is not None:
+                    dist_text = f"{d}km"
+
+            first_img = p.images.first()
+            thumbnail = (first_img.thumb or first_img.origin) if first_img else None
+
+            items.append({
+                "contentId": p.content_id,
+                "contentType": {"id": p.content_type_id, "name": CONTENT_TYPE_LABELS.get(p.content_type_id, "기타")},
+                "title": p.title,
+                "lat": p.mapy,
+                "lng": p.mapx,
+                "thumbnail": thumbnail,
+                "metaLine": meta_line,
+                "distanceText": dist_text,
+                "chips": chips,
+                "isScrapped": (p.pk in scraped_set),
+                "scrapCount": scrap_counts.get(p.pk, 0),
+            })
 
         request._resp_message = "지도용 장소 목록 조회"
         return Response({"total": len(items), "items": items})
+
 
 class PlaceListView(APIView):
     @swagger_auto_schema(

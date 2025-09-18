@@ -32,6 +32,8 @@ class PlaceMapAllQuery(serializers.Serializer):
         required=False, default=[],
         help_text="편의: parking(주차), bbq, wifi, takeout, yard(마당), pets_zone(애견전용), barking_ok, jacuzzi"
     )
+    userLat = serializers.FloatField(required=False, help_text="사용자 위도 (예: 33.4996)")
+    userLng = serializers.FloatField(required=False, help_text="사용자 경도 (예: 126.5312)")
 
 class PlaceDetailQuery(serializers.Serializer):
     userLat = serializers.FloatField(required=False, help_text="사용자 현재 위치의 위도")
