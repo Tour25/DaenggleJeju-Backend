@@ -82,4 +82,40 @@ class PlaceDaenggleItemSerializer(serializers.Serializer):
 
 class PlaceDaenggleResponseSerializer(serializers.Serializer):
     total = serializers.IntegerField()
+    placeTitle = serializers.CharField()
     items = PlaceDaenggleItemSerializer(many=True)
+
+
+class PlacePointShortSerializer(serializers.Serializer):
+    contentId = serializers.IntegerField()
+    title = serializers.CharField()
+    mapx = serializers.FloatField(allow_null=True)
+    mapy = serializers.FloatField(allow_null=True)
+
+class PlaceDaenggleItemWithPlaceSerializer(serializers.Serializer):
+    video_id = serializers.CharField()
+    playbackUrl = serializers.CharField()
+    placeTitle = serializers.CharField()
+    mapx = serializers.FloatField(allow_null=True)
+    mapy = serializers.FloatField(allow_null=True)
+
+class PlaceDaenggleMapResponseSerializer(serializers.Serializer):
+    place = PlacePointShortSerializer()
+    total = serializers.IntegerField()
+    items = PlaceDaenggleItemWithPlaceSerializer(many=True)
+
+
+class PlaceDaenggleFlatItemSerializer(serializers.Serializer):
+    video_id = serializers.CharField()
+    placeTitle = serializers.CharField()
+
+class PlaceDaenggleFlatListResponse(serializers.Serializer):
+    total = serializers.IntegerField()
+    items = PlaceDaenggleFlatItemSerializer(many=True)
+
+class PlaceDaenggleItemWithPlaceSerializer(serializers.Serializer):
+    video_id = serializers.CharField()
+    playbackUrl = serializers.CharField()
+    placeTitle = serializers.CharField()
+    mapx = serializers.FloatField(allow_null=True)
+    mapy = serializers.FloatField(allow_null=True)
