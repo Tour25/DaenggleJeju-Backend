@@ -74,3 +74,12 @@ class PlaceRecommendQuery(serializers.Serializer):
     sort  = serializers.ChoiceField(choices=["rank", "recent", "views"], default="rank")
     limit = serializers.IntegerField(min_value=1, max_value=50, default=20)
     offset= serializers.IntegerField(min_value=0, default=0)
+
+
+class PlaceDaenggleItemSerializer(serializers.Serializer):
+    video_id = serializers.CharField()
+    playbackUrl = serializers.CharField()
+
+class PlaceDaenggleResponseSerializer(serializers.Serializer):
+    total = serializers.IntegerField()
+    items = PlaceDaenggleItemSerializer(many=True)
