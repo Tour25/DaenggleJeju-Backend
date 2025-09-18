@@ -4,7 +4,9 @@ from drf_yasg.utils import swagger_auto_schema
 from django.utils import timezone
 import re
 from django.db.models import Q, Case, When, Value, IntegerField
+from django.db.models import OuterRef, Subquery
 from rest_framework import status
+import random
 
 from places.models import Place
 from .place_daenggle_presets import PLACE_DAENGGLE_VIDEOS
@@ -18,7 +20,7 @@ from rest_framework.permissions import IsAuthenticated
 from .models import DaenggleClip, DaenggleTag, PlaceDaenggle
 
 from members.models import MemberPreference
-from .serializers import RegionShortsQuery, ConceptQuery, TrendingShortsQuery, AccommodationShortsQuery, ShortsSearchQuery, PlaceDaenggleResponseSerializer
+from .serializers import RegionShortsQuery, ConceptQuery, TrendingShortsQuery, AccommodationShortsQuery, ShortsSearchQuery, PlaceDaenggleResponseSerializer, PlaceDaenggleItemWithPlaceSerializer, PlaceDaenggleFlatListResponse
 from daenggle.presets import CURATION_TILES as CONCEPT_PRESETS, REGION_NAME_BY_ID
 
 def _order_by(sort: str):
@@ -224,54 +226,35 @@ class RegionPlainShortsView(APIView):
             "hasMore": has_more,
         })
 
-
 class TrendingShortsView(APIView):
     @swagger_auto_schema(
-        operation_summary="트렌딩(조회수 높은) 댕글 영상",
-        operation_description="TREND 태그 기반. days로 최근 N일 제한 가능.",
+        operation_summary="요즘 뜨는 댕글",
+        operation_description="요즘 뜨는 댕글 영상을 조회합니다.",
         tags=["Daenggle"],
-        query_serializer=TrendingShortsQuery,
+        responses={200: "랜덤 10개 영상 리스트"}
     )
     def get(self, request):
-        s = TrendingShortsQuery(data=request.query_params)
-        s.is_valid(raise_exception=True)
-        d = s.validated_data
+        qs = PlaceDaenggle.objects.select_related("place")
+        all_items = [
+            {
+                "video_id": row.video_id,
+                "placeTitle": row.place.title,
+                "playbackUrl": f"https://www.youtube.com/watch?v={row.video_id}",
+            }
+            for row in qs
+        ]
 
+        items = random.sample(all_items, min(10, len(all_items)))
 
-        clip_ids_sub = DaenggleTag.objects.filter(
-            category=DaenggleTag.Category.TREND
-        ).values("clip_id")
-
-        qs = DaenggleClip.objects.filter(id__in=Subquery(clip_ids_sub))
-
-        qs = qs.order_by(*_order_by(d["sort"]))
-        limit, offset = d["limit"], d["offset"]
-        rows = list(qs[offset: offset + limit + 1])
-        items = rows[:limit]
-        has_more = len(rows) > len(items)
-
-        clip_pk_list = [c.id for c in items]
-        scrap_count_map, user_scrapped_set = _scrap_maps_for_clips(request.user, clip_pk_list)
-
-        data_items = [{
-            "video_id": c.video_id,
-            "title": c.title,
-            "authorName": c.channel_title,
-            "playbackUrl": f"https://www.youtube.com/watch?v={c.video_id}",
-            "caption": (c.description or "")[:140],
-            "published_at": _fmt_yymmdd(c.published_at),
-            "isScrapped": (c.id in user_scrapped_set),
-            "scrapCount": scrap_count_map.get(c.id, 0),
-            "tags": c.tags or [],
-        } for c in items]
-
-        request._resp_message = "조회수 탑 10 댕글 영상"
-        return Response({
-            "items": data_items,
-            "nextCursor": "",
-            "hasMore": has_more,
-        })
-
+        request._resp_message = "요즘 뜨는 댕글 영상"
+        return Response(
+            {
+                "items": items,
+                "nextCursor": "",
+                "hasMore": False,
+            },
+            status=status.HTTP_200_OK,
+        )
 
 
 class RegionShortsView(APIView):
@@ -516,6 +499,7 @@ class PlaceDaenggleRecommendView(APIView):
 
         response_data = {
             "total": len(items),
+            "placeTitle": place.title,
             "items": items,
         }
 
@@ -550,3 +534,62 @@ class SeedPlaceDaenggleView(APIView):
             "created": created,
             "skipped": skipped
         })
+
+class PlaceDaenggleMapAllView(APIView):
+    @swagger_auto_schema(
+        operation_summary="지도용 장소 연관 댕글 영상 조회",
+        operation_description=("지도용 장소 연관 댕글 영상을 조회합니다."),
+        tags=["Daenggle"],
+        responses={200: PlaceDaenggleItemWithPlaceSerializer(many=True)},
+    )
+    def get(self, request):
+        first_video_sq = (
+            PlaceDaenggle.objects
+            .filter(place=OuterRef("pk"))
+            .order_by("id")
+            .values("video_id")[:1]
+        )
+
+        places = (
+            Place.objects
+            .annotate(video_id=Subquery(first_video_sq))
+            .filter(video_id__isnull=False)
+            .order_by("title", "content_id")
+        )
+
+        items = [{
+            "video_id": p.video_id,
+            "playbackUrl": f"https://www.youtube.com/watch?v={p.video_id}",
+            "placeTitle": p.title,
+            "mapx": p.mapx,
+            "mapy": p.mapy,
+        } for p in places]
+
+        request._resp_message = "지도용 장소 연관 댕글 영상 조회"
+        return Response(items, status=status.HTTP_200_OK)
+
+
+class PlaceDaenggleFlatListView(APIView):
+    @swagger_auto_schema(
+        operation_summary="장소 연관 댕글 영상 리스트 조회",
+        operation_description="장소 연관 댕글 영상 리스트를 조회합니다.",
+        tags=["Daenggle"],
+        responses={200: PlaceDaenggleFlatListResponse},
+    )
+    def get(self, request):
+        qs = (
+            PlaceDaenggle.objects
+            .select_related("place")
+            .order_by("place__title", "video_id")
+        )
+
+        items = [
+            {"video_id": row.video_id, "placeTitle": row.place.title}
+            for row in qs
+        ]
+
+        random.shuffle(items)
+
+        resp = {"total": len(items), "items": items}
+        request._resp_message = "장소연관 댕글 영상 리스트 조회"
+        return Response(resp, status=status.HTTP_200_OK)
