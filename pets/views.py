@@ -130,11 +130,34 @@ class PetProfileCreateView(APIView):
         request._resp_message = "반려견 프로필이 저장되었습니다."
         return Response(PetProfileReadSerializer(pet).data, status=status.HTTP_201_CREATED)
 
+class PetProfileListView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @swagger_auto_schema(
+        operation_summary="내 반려견 프로필 목록 조회",
+        operation_description="사용자의 모든 반려견 프로필을 조회합니다.",
+        tags=["Pets/Profiles"],
+        responses={
+            200: openapi.Response("OK", PetProfileReadSerializer(many=True)),
+        },
+    )
+    def get(self, request):
+        pets = (
+            PetProfile.objects
+            .select_related("breed")
+            .filter(user=request.user)
+            .order_by("id")
+        )
+        data = PetProfileReadSerializer(pets, many=True).data
+        request._resp_message = "반려견 프로필 목록 조회"
+        return Response(data, status=200)
+
+
 class PetProfileView(APIView):
     permission_classes = [IsAuthenticated]
 
     @swagger_auto_schema(
-        operation_summary="반려견 프로필  조회",
+        operation_summary="반려견 프로필 조회",
         operation_description="내 반려견 프로필을 조회합니다.",
         tags=["Pets/Profiles"],
         responses={
