@@ -43,12 +43,10 @@ YOUTUBE_RELEVANCE_LANG = os.getenv("YOUTUBE_RELEVANCE_LANG", "ko")
 KAKAO_REST_API_KEY = os.environ.get("KAKAO_REST_API_KEY")
 KAKAO_REDIRECT_URI = os.environ.get("KAKAO_REDIRECT_URI")
 
-ALLOWED_HOSTS = ["localhost", "0.0.0.0","127.0.0.1"]
+ALLOWED_HOSTS = ["localhost", "0.0.0.0","127.0.0.1", "daengglejeju.site", "www.daengglejeju.site"]
 
-SESSION_COOKIE_SAMESITE = "Lax"
-SESSION_COOKIE_HTTPONLY = True
 
-FRONTEND_CALLBACK_URL = os.environ.get("FRONTEND_CALLBACK_URL", "http://localhost:5173//auth/callback")
+FRONTEND_CALLBACK_URL = os.environ.get("FRONTEND_CALLBACK_URL", "http://localhost:5173/auth/callback")
 
 # Application definition
 
@@ -96,10 +94,23 @@ REST_FRAMEWORK = {
 
 CORS_ALLOW_CREDENTIALS = True
 
-CORS_ALLOW_ORIGINS = [
+CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",
-    "https://localhost:5173"
+    "http://localhost:3000",
+    "https://daenggle-jeju-client.vercel.app",
 ]
+
+CSRF_TRUSTED_ORIGINS = [
+    "https://daengglejeju.site",
+    "https://www.daengglejeju.site",
+    "https://daenggle-jeju-client.vercel.app",
+]
+
+SESSION_COOKIE_SAMESITE = "None"
+SESSION_COOKIE_SECURE = True
+SESSION_COOKIE_HTTPONLY = True
+CSRF_COOKIE_SAMESITE = "None"
+CSRF_COOKIE_SECURE = True
 
 ROOT_URLCONF = 'config.urls'
 
