@@ -1,4 +1,5 @@
 from django.db import models
+from places.models import Place
 
 class DaenggleClip(models.Model):
     video_id = models.CharField(max_length=20, unique=True, db_index=True)
@@ -40,3 +41,16 @@ class DaenggleTag(models.Model):
 
     class Meta:
         unique_together = (("category", "context_id", "clip"),)
+
+
+class PlaceDaenggle(models.Model):
+    place = models.ForeignKey(
+        Place, on_delete=models.CASCADE, related_name="daenggle_videos"
+    )
+    video_id = models.CharField(max_length=20, db_index=True)
+
+    class Meta:
+        unique_together = ("place", "video_id")
+
+    def __str__(self):
+        return f"{self.place.title} - {self.video_id}"

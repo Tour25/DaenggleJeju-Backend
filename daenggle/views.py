@@ -4,8 +4,10 @@ from drf_yasg.utils import swagger_auto_schema
 from django.utils import timezone
 import re
 from django.db.models import Q, Case, When, Value, IntegerField
+from rest_framework import status
 
 from places.models import Place
+from .place_daenggle_presets import PLACE_DAENGGLE_VIDEOS
 
 from django.db.models import Count
 from django.contrib.contenttypes.models import ContentType
@@ -13,10 +15,10 @@ from scraps.models import Scrap
 
 from django.db.models import Q, Subquery
 from rest_framework.permissions import IsAuthenticated
-from daenggle.models import DaenggleClip, DaenggleTag
+from .models import DaenggleClip, DaenggleTag, PlaceDaenggle
 
 from members.models import MemberPreference
-from .serializers import RegionShortsQuery, ConceptQuery, TrendingShortsQuery, AccommodationShortsQuery, ShortsSearchQuery, PlaceRecommendQuery
+from .serializers import RegionShortsQuery, ConceptQuery, TrendingShortsQuery, AccommodationShortsQuery, ShortsSearchQuery, PlaceDaenggleResponseSerializer
 from daenggle.presets import CURATION_TILES as CONCEPT_PRESETS, REGION_NAME_BY_ID
 
 def _order_by(sort: str):
@@ -487,91 +489,64 @@ class ShortsSearchView(APIView):
         request._resp_message = "댕글 영상 검색"
         return Response({"items": data_items, "hasMore": has_more, "nextCursor": ""})
 
-
 class PlaceDaenggleRecommendView(APIView):
     @swagger_auto_schema(
-        operation_summary="장소 연관 댕글 추천",
-        operation_description="장소와 비슷한 지역의 댕글 영상을 추천합니다",
+        operation_summary="장소 연관 댕글 영상 조회",
+        operation_description="해당 장소에 연관된 유튜브 영상 리스트를 반환합니다.",
         tags=["Daenggle"],
-        query_serializer=PlaceRecommendQuery,
+        responses={200: PlaceDaenggleResponseSerializer},
     )
     def get(self, request, contentId: int):
-        s = PlaceRecommendQuery(data=request.query_params)
-        s.is_valid(raise_exception=True)
-        d = s.validated_data
-        limit, offset, sort = d["limit"], d["offset"], d["sort"]
-
         try:
             place = Place.objects.get(content_id=contentId)
         except Place.DoesNotExist:
-            return Response({"detail": "장소를 찾을 수 없습니다."}, status=404)
-
-        terms = _addr_terms(place)
-        if not terms:
-            return Response({"items": [], "nextCursor": "", "hasMore": False})
-
-        kw_q = Q()
-        for t in terms:
-            kw_q |= (
-                Q(title__icontains=t) |
-                Q(description__icontains=t) |
-                Q(tags__contains=[t]) |
-                Q(tagging__context_name__icontains=t)
+            return Response(
+                {"detail": "장소를 찾을 수 없습니다."},
+                status=status.HTTP_404_NOT_FOUND,
             )
 
-        base_qs = (
-            DaenggleClip.objects
-            .filter(kw_q)
-            .distinct()
-        )
+        videos = PlaceDaenggle.objects.filter(place=place).values_list("video_id", flat=True)
+        items = [
+            {
+                "video_id": vid,
+                "playbackUrl": f"https://www.youtube.com/watch?v={vid}",
+            }
+            for vid in videos
+        ]
 
-        score = Value(0, output_field=IntegerField())
-        for t in terms:
-            score = score + Case(
-                When(title__iexact=t, then=Value(140)),
-                When(title__istartswith=t, then=Value(110)),
-                When(title__icontains=t, then=Value(90)),
-                When(tags__contains=[t], then=Value(70)),
-                When(tagging__context_name__icontains=t, then=Value(60)),
-                When(description__icontains=t,  then=Value(30)),
-                default=Value(0), output_field=IntegerField(),
-            )
+        response_data = {
+            "total": len(items),
+            "items": items,
+        }
 
-        qs = base_qs.annotate(score=score)
+        request._resp_message = "장소 연관 댕글 영상 조회"
 
-        if sort == "views":
-            qs = qs.order_by("-score", "-view_count", "-published_at", "-id")
-        elif sort == "recent":
-            qs = qs.order_by("-score", "-published_at", "-id")
-        else:
-            qs = qs.order_by("-score", "-published_at", "-view_count", "-id")
+        return Response(response_data, status=status.HTTP_200_OK)
 
-        qs = qs.distinct()
+class SeedPlaceDaenggleView(APIView):
 
-        rows = list(qs[offset: offset + limit + 1])
-        items = rows[:limit]
-        has_more = len(rows) > len(items)
-        page_total = len(items)
+    @swagger_auto_schema(
+        operation_summary="서버용: 장소 연관 영상 데이터 저장",
+        operation_description="장소 연관 영상 데이터를 저장합니다.",
+        tags=["Daenggle"]
+    )
+    def post(self, request):
+        created, skipped = 0, 0
+        for content_id, video_ids in PLACE_DAENGGLE_VIDEOS.items():
+            try:
+                place = Place.objects.get(content_id=content_id)
+            except Place.DoesNotExist:
+                skipped += 1
+                continue
 
-        clip_pk_list = [c.id for c in items]
-        scrap_count_map, user_scrapped_set = _scrap_maps_for_clips(request.user, clip_pk_list)
-
-        data_items = [{
-            "video_id": c.video_id,
-            "title": c.title,
-            "authorName": c.channel_title,
-            "authorAvatarUrl": (c.style_meta or {}).get("channelAvatar"),
-            "thumbUrl": _cx_pick_thumb(c.thumbnails),
-            "playbackUrl": f"https://www.youtube.com/watch?v={c.video_id}",
-            "published_at": _fmt_yymmdd(c.published_at),
-            "isScrapped": (c.id in user_scrapped_set),
-            "scrapCount": scrap_count_map.get(c.id, 0),
-            "tags": c.tags or [],
-        } for c in items]
-
+            for vid in video_ids:
+                _, is_created = PlaceDaenggle.objects.get_or_create(
+                    place=place, video_id=vid
+                )
+                if is_created:
+                    created += 1
         return Response({
-            "total": page_total,
-            "items": data_items,
-            "nextCursor": "",
-            "hasMore": has_more,
+            "status": "ok",
+            "created": created,
+            "skipped": skipped
         })

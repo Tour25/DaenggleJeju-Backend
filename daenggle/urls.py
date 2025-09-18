@@ -1,5 +1,5 @@
 from django.urls import path
-from .views import RegionShortsView, ConceptShortsView, RegionPlainShortsView, TrendingShortsView, AccommodationShortsView, ShortsSearchView, PlaceDaenggleRecommendView
+from .views import RegionShortsView, ConceptShortsView, RegionPlainShortsView, TrendingShortsView, AccommodationShortsView, ShortsSearchView, PlaceDaenggleRecommendView, SeedPlaceDaenggleView
 
 urlpatterns = [
     path("/trending",TrendingShortsView.as_view()),
@@ -8,5 +8,6 @@ urlpatterns = [
     path("/preference", RegionShortsView.as_view(), name="shorts-region"),
     path("/concepts", ConceptShortsView.as_view(), name="shorts-concepts"),
     path("/search", ShortsSearchView.as_view(), name="shorts-search"),
-    path("/places/<int:contentId>/recommendations", PlaceDaenggleRecommendView.as_view(), name="shorts-recommendations")
+    path("/places/<int:contentId>/recommendations", PlaceDaenggleRecommendView.as_view(), name="shorts-recommendations"),
+    path("/seed-daenggle/", SeedPlaceDaenggleView.as_view(), name="seed_place_daenggle"),
 ]
