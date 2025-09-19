@@ -31,7 +31,7 @@ load_dotenv()
 SECRET_KEY = os.getenv("SECRET_KEY")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = False
 
 KTO_PET_API_KEY = os.getenv("KTO_PET_API_KEY")
 KTO_BASE_URL = os.getenv("KTO_BASE_URL")
@@ -111,11 +111,14 @@ CSRF_TRUSTED_ORIGINS = [
     "https://daenggle-jeju-client.vercel.app",
 ]
 
+CSRF_COOKIE_DOMAIN = ".daengglejeju.site"
+CSRF_COOKIE_SAMESITE = "None"
+CSRF_COOKIE_SECURE = True
+
+
 SESSION_COOKIE_SAMESITE = "None"
 SESSION_COOKIE_SECURE = True
 SESSION_COOKIE_HTTPONLY = True
-CSRF_COOKIE_SAMESITE = "None"
-CSRF_COOKIE_SECURE = True
 
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 USE_X_FORWARDED_HOST = True
