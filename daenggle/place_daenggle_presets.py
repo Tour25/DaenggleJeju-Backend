@@ -58,4 +58,30 @@ PLACE_DAENGGLE_VIDEOS = {
     126464: ["Fob01XCytQM", "OX2X_pKIWD4"],  # 여미지식물원
     130474: ["C-aPfzrJmHU", "0CBHgLO6P2M"],  # 제주민속촌
     129617: ["o0uv5_xDn2s", "4HK3UZN42UE", "j5DsHiczkZ4"],  # 쇠소깍
+    73:["Sfjxz62D4-Y"],
+    74:["QcnDiAgwuZ0","zSo4vmC4Fw4"],
+    75:["dp2SiA20d_c", "_CrEf2xNUBs"],
+    76:["wMN3fWKWr04"],
+    77:["Ho9yiRVXEW8"],
+    78:["IhPNWWocMKU", "UYfZVSgQyEw"],
+    79:["ZlFoW7vS1tg"],
+    80:["w9yIooDnBcI", "eHGc2hZUcaA"],
+    81:["kkvWpvFsF5g", "sh-BBoMwlng"],
+    82:["ePF-0SaAFi4","9wCTyS2jVv4"],
+    83:["vSsPrukjpO8", "csoHxq6x1e8"],
+    84:["5hK9-nC0lMM","i6W_OB8KjcA"],
+    85:["5xjWeYQn5tI"],
+    86:["jouvYzXL9MM","_LgdlMRFMu4"],
+    87:["v5PW7wZwgKA","uR-njMqR6rw"],
+    88:["EEoPASvUr6k"],
+    89:["mUsQMIpouUI","iI-HJl7QvMs"],
+    90:["JWmR4c5iYOs","oZ9ZVaqUXks"],
+    91:["LCRh-WQiq_g","epYx9nUDoCc"],
+    92:["zb-VF--6rhU"],
+    93:["hHQkzGzR1nk"],
+    94:["-PUmwN5laL4","kNe4M23g0wk"],
+    95:["fbS13owoQEg","iupx6poHXkE"],
+    96:["f_cktWeO9j8"],
+    97:["Dc9evY3krok"],
+    98:["gLWo-7TOVCk"]
 }
