@@ -438,10 +438,9 @@ class PlaceSearchView(APIView):
             if cond and cond != "정보없음": algo_chips.append(cond)
             if amens: algo_chips.append(amens[0])
 
-            policy_chips = parse_policy_chips(policy)
-            merged_chips = merge_chips(policy_chips, algo_chips, max_len=4)
-
-            chips_value = merged_chips[0] if len(merged_chips) == 1 else merged_chips
+            c1, c2 = parse_policy_chips(policy)
+            chips1 = merge_chips(c1, algo_chips, max_len=4)
+            chips2 = c2[:4] if c2 else []
 
             meta_line = f"{address_brief(p.addr1)} · {place_type_label(p) or ''}".rstrip(" ·")
 
@@ -458,7 +457,8 @@ class PlaceSearchView(APIView):
                 "metaLine": meta_line,
                 "distanceText": dist_text,
                 "thumbnail": thumb_or_text(p),
-                "chips": chips_value,
+                "chips1": chips1,
+                "chips2": chips2,
                 "isScrapped": (p.pk in scraped_set),
                 "scrapCount": scrap_counts,
             }
@@ -466,6 +466,7 @@ class PlaceSearchView(APIView):
 
         request._resp_message = "장소 검색 결과"
         return Response({"total": len(items), "items": items})
+
 
 class LoadHardcodedView(APIView):
     @swagger_auto_schema(

@@ -314,4 +314,135 @@ HARDCODED: dict[int, dict] = {
         "chips2": ["연중무휴", "주차 가능", "입장료 무료"],
         "images": ["http://tong.visitkorea.or.kr/cms/resource/00/3536100_image3_1.jpg"]
     },
+    73: {
+        "chips1": ["전화 문의 필요", "목줄 착용"],
+        "chips2": ["주차 가능", "사전 예약 필수", "동반 탑승"],
+        "images": ["https://img1.kakaocdn.net/cthumb/local/C544x408.q50/?fname=http%3A%2F%2Ft1.kakaocdn.net%2Fmystore%2FE29585A888144F19A51B78F7E6DBA895"]
+    },
+    74: {
+        "chips1": ["전화 문의 필요", "목줄 착용"],
+        "chips2": ["연중무휴", "주차 가능", "동반 탑승"],
+        "images": ["https://search.pstatic.net/common/?src=https%3A%2F%2Fnaverbooking-phinf.pstatic.net%2F20240316_88%2F1710555227810SO5Kf_JPEG%2FKakaoTalk_20231030_121557873_08.jpg"]
+    },
+    75: {
+        "chips1": ["대형견까지", "모든 구역", "목줄+이동장 사용"],
+        "chips2": ["연중무휴", "주차 가능", "동반 탑승"],
+        "images": ["https://cdn.visitkorea.or.kr/img/call?cmd=VIEW&id=e6afbfb1-40e3-48fc-8bed-8805eb170ead"]
+    },
+    76: {
+        "chips1": ["전화 문의 필요", "목줄 착용"],
+        "chips2": ["연중무휴", "주차 가능", "동반 탑승"],
+        "images": ["https://tong.visitkorea.or.kr/cms/resource/14/2752114_image2_1.jpg"]
+    },
+    77: {
+        "chips1": ["전화 문의 필요", "목줄 착용"],
+        "chips2": ["주차 가능", "카약", "패들보드", "동반 탑승", "드론촬영"],
+        "images": ["https://search.pstatic.net/common/?src=https%3A%2F%2Fldb-phinf.pstatic.net%2F20250724_203%2F1753321117724WjDMf_JPEG%2F1746971499954.jpg"]
+    },
+    78: {
+        "chips1": ["소형견", "모든 구역", "목줄 착용"],
+        "chips2": ["주차 가능", "마당", "바베큐"],
+        "images": ["https://search.pstatic.net/common/?src=https%3A%2F%2Fldb-phinf.pstatic.net%2F20250905_87%2F1757064392218HGIlO_JPEG%2F3._%25B5%25B6%25C3%25A4_2.jpg"]
+    },
+    79: {
+        "chips1": ["5kg 이하", "모든 구역", "목줄 착용"],
+        "chips2": ["주차 가능", "마당", "독채"],
+        "images": ["https://img1.kakaocdn.net/cthumb/local/C800x800.q50/?fname=http%3A%2F%2Ft1.kakaocdn.net%2Fmystore%2F13D47404A7AF41B1A6AB50B822C2BBDA"]
+    },
+    80: {
+        "chips1": ["모든 크기", "모든 구역", "목줄 착용"],
+        "chips2": ["주차 가능", "마당", "독채", "자쿠지", "강아지 침대", "샴푸", "튜브", "간식 구비"],
+        "images": ["https://img1.kakaocdn.net/cthumb/local/C544x408.q50/?fname=https%3A%2F%2Fpostfiles.pstatic.net%2FMjAyNTA3MjFfMTU5%2FMDAxNzUzMDU4MTc1Mjg1.vl7_W6QNWHlKWqFQLvJdlrOc4Ojxjoy8fEZJHa_JtWog.Es1wZHvBmxLRIIfYaj67cpkic3tx0Lz3uYTrFDYed_og.JPEG%2F20250721093614.jpeg%3Ftype%3Dw966"]
+    },
+    81: {
+        "chips1": ["8kg 이하", "모든 구역", "목줄 착용"],
+        "chips2": ["주차 가능", "200여평 잔디 마당", "애견 전용 공간", "10종 애견 용품·유모차·카시트 구비"],
+        "images": ["https://img1.kakaocdn.net/cthumb/local/C544x408.q50/?fname=http%3A%2F%2Ft1.kakaocdn.net%2Fmystore%2F48D899E59FFA4A8CA12FD4062F5147AD"]
+    },
+    82: {
+        "chips1": ["7kg 미만", "모든 구역", "목줄 착용"],
+        "chips2": ["주차 가능", "180평 잔디 마당", "조식", "노을뷰", "바다뷰", "미끄럼 방지 시공"],
+        "images": ["https://api.cdn.visitjeju.net/photomng/imgpath/202308/14/5ec0e5e7-f485-4bbf-b0e3-81fd33c9408b.png"]
+    },
+    83: {
+        "chips1": ["10kg 미만", "모든 구역", "목줄 자유"],
+        "chips2": ["주차 가능", "700여평 정원", "바베큐", "조식"],
+        "images": ["https://search.pstatic.net/common/?src=https%3A%2F%2Fldb-phinf.pstatic.net%2F20200910_13%2F1599715400407LMktS_JPEG%2FKakaoTalk_20200910_140906760.jpg"]
+    },
+    84: {
+        "chips1": ["전화 문의 필요", "목줄 착용"],
+        "chips2": ["주차 가능", "대형 자쿠지", "바다 근처"],
+        "images": ["https://search.pstatic.net/common/?src=https%3A%2F%2Fldb-phinf.pstatic.net%2F20240718_198%2F1721281083981nqviD_JPEG%2FIMG_1951.jpeg"]
+    },
+    85: {
+        "chips1": ["7kg 이하", "일부 구역", "목줄 착용"],
+        "chips2": ["주차 가능", "가성비", "비자림 숲길 근처"],
+        "images": ["https://a0.muscache.com/im/pictures/miso/Hosting-759745825744247646/original/8ca8e53d-9b8c-44e2-80f4-6a0a1d428e2e.jpeg?im_w=720"]
+    },
+    86: {
+        "chips1": ["10kg 이하", "모든 구역", "목줄 자유"],
+        "chips2": ["주차 가능", "애견 용품 구비", "잔디 마당", "물놀이"],
+        "images": ["https://mblogthumb-phinf.pstatic.net/MjAyMzA1MTJfMTk5/MDAxNjgzOTAxNzkzOTQ2.ekQ3OiNitRIS190CBEyJy_2fQQ1MEumQ1HSMRhJLNucg.RTafk0AuTIzzl9MwgBN1ISFh7ErU-xzP1NHUF-8xSFIg.JPEG.joono_84/IMG_3568.jpeg?type=w800"]
+    },
+    87: {
+        "chips1": ["대형견까지", "모든 구역", "목줄 착용"],
+        "chips2": ["주차 가능", "애견 용품 구비"],
+        "images": ["https://peton.me/data/file/addPlace/%EB%A7%98%EC%95%A4%EB%8F%84%EA%B7%B8_%EC%86%A1%EB%8B%B94%EA%B8%B8_3.webp"]
+    },
+    88: {
+        "chips1": ["20kg 미만", "모든 구역", "목줄 착용"],
+        "chips2": ["주차 가능", "통나무 집", "애견 용품 구비", "바베큐", "잔디 정원"],
+        "images": ["https://yaimg.yanolja.com/v5/2021/04/07/10/1280/606d8720664b88.51783714.jpg"]
+    },
+    89: {
+        "chips1": ["모든 크기", "야외 전체", "이동장 사용"],
+        "chips2": ["주차 가능", "치킨난반정식", "새우튀김 냉소바", "새우튀김 우동", "규동"],
+        "images": ["https://d12zq4w4guyljn.cloudfront.net/750_750_20240215115534009_photo_65807fb44eb9.webp"]
+    },
+    90: {
+        "chips1": ["소형견까지", "모든 구역", "이동장 사용"],
+        "chips2": ["주차 가능", "예약 가능", "돌문어커리", "딱새우토마토우커리"],
+        "images": ["https://img1.kakaocdn.net/cthumb/local/C800x800.q50/?fname=http%3A%2F%2Ft1.daumcdn.net%2Flocal%2FkakaomapPhoto%2Freview%2F8371b6abd041aad855e0e5a56166d356254c0059%3Foriginal"]
+    },
+    91: {
+        "chips1": ["모든 크기", "실내 전체", "목줄 착용"],
+        "chips2": ["주차 가능", "협재 해수욕장 2분 거리", "딱새우파스타", "황게크림리조또", "흑돼지에그인헬"],
+        "images": ["https://postfiles.pstatic.net%2FMjAyNTA0MDNfMTE1%2FMDAxNzQzNjY2MDA2NDM0.-MNQrdqjCxbjskZm5Zq5fBJhpXfY7piToRZOboFQL7sg.l_li9I4QZ3TGn-0obhMVfF5uO4M-kZeo8EWY48djMpAg.JPEG%2FHEE00544.jpg%3Ftype%3Dw966"]
+    },
+    92: {
+        "chips1": ["모든 크기", "실내 전체", "이동장 사용"],
+        "chips2": ["주차 가능", "동백동산 근처", "제주참돔구이", "수제떡갈비", "제주흑돼지제육"],
+        "images": ["https://d12zq4w4guyljn.cloudfront.net/750_750_20240807052945830_photo_7711b4aca86d.webp"]
+    },
+    93: {
+        "chips1": ["소형견까지", "실내 전체", "이동장 사용"],
+        "chips2": ["주차 가능", "최상급 흑돼지", "성게세트", "구워 주는"],
+        "images": ["https://img1.kakaocdn.net/cthumb/local/C800x800.q50/?fname=http%3A%2F%2Ft1.daumcdn.net%2Flocal%2FkakaomapPhoto%2Freview%2F969851e82f97b2caeac4003dc2160bafebffc667%3Foriginal"]
+    },
+    94: {
+        "chips1": ["모든 크기", "실외 전체", "이동장 사용"],
+        "chips2": ["주차 가능", "낙지볶음", "된장찌개"],
+        "images": ["https://postfiles.pstatic.net%2FMjAyNTA5MjBfOTIg%2FMDAxNzU4MzY2NjQ2Mzcy.XUUnRykQCfUmH4twqGeRyNuBZbOwbhME1gZboz_oDtIg.cEV7gHTR_MroQQ9pvzb-Co0ahoaRh7fbc7fbcAxB7oHdy4Eg.JPEG%2FKakaoTalk_20250920_195703802_21.jpg%3Ftype%3Dw773"]
+    },
+    95: {
+        "chips1": ["모든 크기", "모든 구역", "목줄 착용"],
+        "chips2": ["주차 가능", "바다뷰", "당근버거", "마늘버거", "시금치버거", "스파이시 치킨버거"],
+        "images": ["http%3A%2F%2Ft1.daumcdn.net%2Flocal%2FkakaomapPhoto%2Freview%2F079b1c32bddbf3fd3350ad1aeffee69d2755e659%3Foriginal"]
+    },
+    96: {
+        "chips1": ["모든 크기", "모든 구역", "목줄 착용"],
+        "chips2": ["주차 가능", "뼈등심 스테이크(돈마호크)", "숄더랙 스테이크", "아일랜드 앤초비 파스타"],
+        "images": ["http%3A%2F%2Ft1.kakaocdn.net%2Fmystore%2F234D3FC7A88A448AA2C345ACAA463155"]
+    },
+    97: {
+        "chips1": ["소형견까지", "실내 전체", "이동장 사용"],
+        "chips2": ["고등어회", "딱새우회", "모둠회", "한치떡볶이", "뼈없는 갈치튀김"],
+        "images": ["http%3A%2F%2Ft1.daumcdn.net%2Flocal%2FkakaomapPhoto%2Freview%2Fc966e8c72e487f4ec27a2183562f9ec752a49907%3Foriginal"]
+    },
+    98: {
+        "chips1": ["소형견까지", "실내 전체", "이동장 사용"],
+        "chips2": ["주차 가능", "예약가능", "협재해수욕장 근처", "바다뷰", "숯불", "흑돼지 세트", "구워 주는"],
+        "images": ["http%3A%2F%2Ft1.daumcdn.net%2Flocal%2FkakaomapPhoto%2Freview%2F646513d8a2173a4dd5537992a637cb4489cbc906%3Foriginal"]
+    },
+
 }
