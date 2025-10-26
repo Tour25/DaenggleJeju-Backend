@@ -22,7 +22,6 @@ def ingest_hardcoded(*, dry_run: bool = False, allow_data_urls: bool = True) -> 
         if not x:
             return []
         if isinstance(x, str):
-
             try:
                 v = json.loads(x)
                 if isinstance(v, list):
@@ -30,13 +29,13 @@ def ingest_hardcoded(*, dry_run: bool = False, allow_data_urls: bool = True) -> 
             except Exception:
                 pass
             import re
-            return [s.strip() for s in re.split(r"[,\\n]+", x) if s.strip()]
+            # 콤마/개행만 분리자로 사용
+            return [s.strip() for s in re.split(r"[,\n]+", x) if s.strip()]
         if isinstance(x, (list, tuple)):
             return [str(s).strip() for s in x if str(s).strip()]
         return []
 
     def _merge_unique(a, b):
-
         return sorted(
             {s for s in (a or []) if isinstance(s, str)} |
             {s for s in (b or []) if isinstance(s, str)}
@@ -56,18 +55,17 @@ def ingest_hardcoded(*, dry_run: bool = False, allow_data_urls: bool = True) -> 
                 stats["logs"].append(f"[SKIP] Place 없음: content_id={content_id}")
                 continue
 
-
             chips1_in = _to_list((payload or {}).get("chips1"))
             chips2_in = _to_list((payload or {}).get("chips2"))
             legacy = _to_list((payload or {}).get("chips"))
 
+            if legacy:
+                if not (chips1_in or chips2_in):
+                    chips1_in = legacy
 
-            if legacy and not chips1_in:
-                chips1_in = legacy
 
             if chips1_in or chips2_in:
                 policy, _ = PetPolicy.objects.get_or_create(place=place)
-
 
                 info = {}
                 if policy.etc_info:
@@ -83,10 +81,15 @@ def ingest_hardcoded(*, dry_run: bool = False, allow_data_urls: bool = True) -> 
                 merged1 = _merge_unique(before1, chips1_in)
                 merged2 = _merge_unique(before2, chips2_in)
 
-                if isinstance(info.get("chips"), list):
-                    migrated = _merge_unique(merged1, _to_list(info.get("chips")))
-                    merged1 = migrated
-                    info.pop("chips", None)
+                legacy_info_chips = _to_list(info.get("chips"))
+                if legacy_info_chips:
+                    if chips1_in or chips2_in:
+                        info.pop("chips", None)
+                        stats["logs"].append(f"[DROP] legacy 'chips' ignored since hardcoded provided: {content_id}")
+                    else:
+                        merged1 = _merge_unique(merged1, legacy_info_chips)
+                        info.pop("chips", None)
+                        stats["logs"].append(f"[MIGRATE] legacy 'chips' -> chips1: {content_id} +{len(legacy_info_chips)}")
 
                 info["chips1"] = merged1
                 info["chips2"] = merged2
@@ -99,7 +102,6 @@ def ingest_hardcoded(*, dry_run: bool = False, allow_data_urls: bool = True) -> 
                 stats["logs"].append(
                     f"[OK] chips1/2 병합: {content_id} -> chips1={merged1} | chips2={merged2}"
                 )
-
 
             if "images" in (payload or {}):
                 raw_list = (payload or {}).get("images") or []
