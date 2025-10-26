@@ -36,11 +36,17 @@ ENTRY_LABELS = {
 }
 
 
-def _entry_chip(fp: Footprint) -> Optional[str]:
+def _entry_chip(fp):
     if fp.entry_status == "detail":
-        return (fp.entry_status_detail or "").strip() or None
-    return ENTRY_LABELS.get(fp.entry_status)
 
+        detail = (
+            getattr(fp, "entry_detail", None)
+            or getattr(fp, "entry_status_detail", None)
+            or ""
+        )
+        detail = detail.strip()
+        return detail or None
+    return ENTRY_LABELS.get(fp.entry_status)
 
 def _conditions_chip(fp: Footprint) -> Optional[str]:
     if not fp.conditions:
