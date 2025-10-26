@@ -60,7 +60,7 @@ class DummyFootprintSeedView(APIView):
     permission_classes = [AllowAny]
 
     @swagger_auto_schema(
-        operation_summary="서버용:발자국 더미 데이터 저장",
+        operation_summary="서버용:발자국 더미 데이터 저장 - 필수 실행",
         operation_description="각 장소에 리뷰를 2개씩 저장합니다.",
         tags=["Footprints"],
         responses={

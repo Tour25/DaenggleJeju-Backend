@@ -469,7 +469,7 @@ class PlaceSearchView(APIView):
 
 class LoadHardcodedView(APIView):
     @swagger_auto_schema(
-        operation_summary="서버용: 장소 추가 데이터 저장",
+        operation_summary="서버용: 장소 추가 데이터 저장 - 필수 실행",
         operation_description="장소 추가 데이터를 저장합니다.",
         tags=["Places"]
     )

@@ -510,7 +510,7 @@ class PlaceDaenggleRecommendView(APIView):
 class SeedPlaceDaenggleView(APIView):
 
     @swagger_auto_schema(
-        operation_summary="서버용: 장소 연관 영상 데이터 저장",
+        operation_summary="서버용: 장소 연관 영상 데이터 저장 - 필수 실행",
         operation_description="장소 연관 영상 데이터를 저장합니다.",
         tags=["Daenggle"]
     )

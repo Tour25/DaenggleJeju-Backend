@@ -159,7 +159,7 @@ class TilePresetSyncView(APIView):
     MAX_TARGET_PER_TILE = 10
 
     @swagger_auto_schema(
-        operation_summary="서버용: 타일 프리셋 영상 수집(바디 없음, 전체 타일 수집)",
+        operation_summary="서버용: 타일 프리셋 영상 수집(바디 없음, 전체 타일 수집) - 필수 실행",
         operation_description="컨셉(타일)별로 영상을 수집합니다.",
         tags=["Integration/YouTube"],
         request_body=None,
