@@ -35,7 +35,6 @@ AMENITY_TOKEN_TO_LABEL = {
     "jacuzzi": "자쿠지",
 }
 
-
 _CHIP_SYNONYMS = {
     # 조건/규정
     "목줄착용": "목줄착용", "목줄 착용": "목줄착용", "leash": "목줄착용",
@@ -58,6 +57,7 @@ _CHIP_SYNONYMS = {
     "실내일부": "실내일부", "실외일부": "실외일부",
     "모든구역": "모든구역", "모든 구역": "모든구역",
     "야외풀": "야외풀", "야외 수영장": "야외풀",
+    "야외 전체": "야외", "실내 전체": "실내",
 
     # 편의시설/속성
     "와이파이": "와이파이", "wifi": "와이파이", "무선인터넷": "와이파이",
@@ -68,28 +68,25 @@ _CHIP_SYNONYMS = {
     "독채숙소": "독채숙소",
     "애견동반": "애견동반",
 
-    # 기타
     "주차가능": "주차가능", "주차 가능": "주차가능",
+
+    "목줄+이동장 사용": "목줄+이동장 사용",
+    "목줄+입마개 착용": "목줄+입마개 착용",
+    "목줄(하네스) 착용": "목줄(하네스) 착용",
+    "목줄+매너벨트 착용": "목줄+매너벨트 착용",
 }
 
 def _norm_chip(s: str) -> str:
-
     t = (s or "").strip()
     if not t:
         return t
-
-    t = re.sub(r"^[#•\-\*]+\s*", "", t)
-
-    t = t.strip()
-
+    t = re.sub(r"^[#•\-\*]+\s*", "", t).strip()
     low = t.lower()
     if low in _CHIP_SYNONYMS:
         return _CHIP_SYNONYMS[low]
-
     return _CHIP_SYNONYMS.get(t, t)
 
 def _safe_json_loads(s: str):
-
     try:
         return json.loads(s)
     except Exception:
@@ -98,58 +95,85 @@ def _safe_json_loads(s: str):
         except Exception:
             return None
 
-def parse_policy_chips(policy) -> List[str]:
+def parse_policy_chips(policy) -> Tuple[List[str], List[str]]:
 
     if not policy:
+        return ([], [])
+
+    def _to_list(x):
+        if not x:
+            return []
+        if isinstance(x, str):
+            j = _safe_json_loads(x)
+            if isinstance(j, list):
+                return [str(s).strip() for s in j if str(s).strip()]
+            if isinstance(j, dict):
+                out = []
+                if "chips1" in j:
+                    out += _to_list(j.get("chips1"))
+                if "chips2" in j:
+                    out += _to_list(j.get("chips2"))
+                if not out and "chips" in j:
+                    out += _to_list(j.get("chips"))
+                return out
+            return [t.strip() for t in re.split(r"[,/|\n]+", x) if t.strip()]
+        if isinstance(x, (list, tuple)):
+            return [str(s).strip() for s in x if str(s).strip()]
+        if isinstance(x, dict):
+            if "chips1" in x or "chips2" in x:
+                return _to_list(x.get("chips1", [])) + _to_list(x.get("chips2", []))
+            if "chips" in x:
+                return _to_list(x.get("chips"))
         return []
 
-    out: List[str] = []
+    def _dedup_norm(arr: List[str]) -> List[str]:
+        normed = [_norm_chip(s) for s in arr if s and str(s).strip()]
+        seen, out = set(), []
+        for c in normed:
+            if c not in seen:
+                seen.add(c)
+                out.append(c)
+        return out
 
-    raw = getattr(policy, "chips", None)
-    if raw:
-        if isinstance(raw, list):
-            out += raw
-        elif isinstance(raw, dict):
-            out += raw.get("chips") or []
-        elif isinstance(raw, str):
-            j = _safe_json_loads(raw)
-            if isinstance(j, list):
-                out += j
-            elif isinstance(j, dict) and "chips" in j:
-                out += j.get("chips") or []
-            else:
-                out += re.split(r"[,/|\n]+", raw)
+    chips1: List[str] = []
+    chips2: List[str] = []
+
+    chips1 += _to_list(getattr(policy, "chips1", None))
+    chips2 += _to_list(getattr(policy, "chips2", None))
 
     txt = (getattr(policy, "etc_info", "") or "").strip()
     if txt:
-
         j = _safe_json_loads(txt)
-        if isinstance(j, dict) and "chips" in j:
-            out += j.get("chips") or []
+        if isinstance(j, dict):
+            if "chips1" in j:
+                chips1 += _to_list(j.get("chips1"))
+            if "chips2" in j:
+                chips2 += _to_list(j.get("chips2"))
+            if "chips" in j:
+                chips1 += _to_list(j.get("chips"))
         elif isinstance(j, list):
-            out += j
+            chips1 += _to_list(j)
         else:
-            # "chips: a, b, c" 또는 "[chips] a, b"
+
             m = re.search(r"(?:^\s*(?:chips|칩|태그)\s*:\s*)(.+)$", txt, re.IGNORECASE | re.MULTILINE)
             if m:
-                out += re.split(r"[,/|]+", m.group(1))
+                chips1 += [t.strip() for t in re.split(r"[,/|]+", m.group(1)) if t.strip()]
             for mm in re.finditer(r"\[?\s*chips\s*\]?\s*([^\n]+)", txt, re.IGNORECASE):
-                out += re.split(r"[,/|]+", mm.group(1))
-            # 해시태그
-            out += [h for h in re.findall(r"#([^\s,#]+)", txt)]
+                chips1 += [t.strip() for t in re.split(r"[,/|]+", mm.group(1)) if t.strip()]
 
-    # 정규화 + 중복 제거(순서 보존)
-    normed = [_norm_chip(c) for c in out if c and str(c).strip()]
-    seen = set()
-    uniq: List[str] = []
-    for c in normed:
-        if c not in seen:
-            seen.add(c)
-            uniq.append(c)
-    return uniq
+            chips1 += [h for h in re.findall(r"#([^\s,#]+)", txt)]
+
+    legacy = getattr(policy, "chips", None)
+    if legacy:
+        chips1 += _to_list(legacy)
+
+    # 정규화 + 중복 제거
+    chips1 = _dedup_norm(chips1)
+    chips2 = _dedup_norm(chips2)
+
+    return chips1, chips2
 
 def merge_chips(primary: List[str], secondary: List[str], max_len: Optional[int] = None) -> List[str]:
-
     seen = set(primary)
     merged = list(primary)
     for c in secondary:
@@ -326,12 +350,10 @@ def split_terms(qstr: str) -> List[str]:
 def and_icontains(fields: List[str], terms: List[str]) -> Q:
     if not fields or not terms:
         return Q()
-
     q_total = None
     for t in terms:
         subq = Q()
         for f in fields:
             subq |= Q(**{f"{f}__icontains": t})
         q_total = subq if q_total is None else (q_total & subq)
-
     return q_total or Q()

@@ -156,8 +156,9 @@ class PlaceMapAllView(APIView):
             if cond and cond != "정보없음": algo_chips.append(cond)
             if amens: algo_chips.append(amens[0])
 
-            policy_chips = parse_policy_chips(policy)
-            chips = merge_chips(policy_chips, algo_chips, max_len=4)
+            c1, c2 = parse_policy_chips(policy)
+            chips1 = merge_chips(c1, algo_chips, max_len=4)
+            chips2 = c2[:4] if c2 else []
 
             meta_line = f"{address_brief(p.addr1)} · {place_type_label(p) or ''}".rstrip(" ·")
 
@@ -179,7 +180,8 @@ class PlaceMapAllView(APIView):
                 "thumbnail": thumbnail,
                 "metaLine": meta_line,
                 "distanceText": dist_text,
-                "chips": chips,
+                "chips1": chips1,
+                "chips2": chips2,
                 "isScrapped": (p.pk in scraped_set),
                 "scrapCount": scrap_counts.get(p.pk, 0),
             })
@@ -239,8 +241,9 @@ class PlaceListView(APIView):
             if cond and cond != "정보없음": algo_chips.append(cond)
             if amens: algo_chips.append(amens[0])
 
-            policy_chips = parse_policy_chips(policy)
-            chips = merge_chips(policy_chips, algo_chips, max_len=4)
+            c1, c2 = parse_policy_chips(policy)
+            chips1 = merge_chips(c1, algo_chips, max_len=4)
+            chips2 = c2[:4] if c2 else []
 
             meta_line = f"{address_brief(p.addr1)} · {place_type_label(p) or ''}".rstrip(" ·")
 
@@ -257,7 +260,8 @@ class PlaceListView(APIView):
                 "metaLine": meta_line,
                 "distanceText": dist_text,
                 "thumbnail": thumb_or_text(p),
-                "chips": chips,
+                "chips1": chips1,
+                "chips2": chips2,
                 "isScrapped": (p.pk in scraped_set),
                 "scrapCount": scrap_counts.get(p.pk, 0),
             })
@@ -332,13 +336,11 @@ class PlaceDetailFullView(APIView):
         images = [{"origin": img.origin, "thumb": img.thumb or None} for img in p.images.all()]
         src = collect_text(p)
 
-        chips = {
-            "sizes": find_labels(src, SIZE_KEYWORDS),
-            "areas": find_labels(src, AREA_KEYWORDS),
-            "conditions": conditions_text(policy),
-            "amenities": find_labels(src, AMENITY_KEYWORDS),
-            "policy": parse_policy_chips(policy),
-        }
+        sizes = find_labels(src, SIZE_KEYWORDS)
+        areas = find_labels(src, AREA_KEYWORDS)
+        amens = find_labels(src, AMENITY_KEYWORDS)
+        conds_text = conditions_text(policy)
+        c1, c2 = parse_policy_chips(policy)
 
         data = {
             "title": p.title,
@@ -348,7 +350,8 @@ class PlaceDetailFullView(APIView):
             "homepage": text_or_unknown(p.homepage),
             "thumbnail": thumb_or_text(p),
             "images": images,
-            "chips": chips,
+            "chips1": c1,
+            "chips2": c2,
             "petPolicy": {
                 "acmpyTypeCd": text_or_unknown(getattr(policy, "acmpy_type_cd", None)),
                 "notes": _extract_policy_notes(policy),
