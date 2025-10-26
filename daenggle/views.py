@@ -144,6 +144,7 @@ class AccommodationShortsView(APIView):
         scrap_count_map, user_scrapped_set = _scrap_maps_for_clips(request.user, clip_pk_list)
 
         data_items = [{
+            "id": c.id,
             "video_id": c.video_id,
             "title": c.title,
             "authorName": c.channel_title,
@@ -207,6 +208,7 @@ class RegionPlainShortsView(APIView):
         scrap_count_map, user_scrapped_set = _scrap_maps_for_clips(request.user, clip_pk_list)
 
         data_items = [{
+            "id": c.id,
             "video_id": c.video_id,
             "title": c.title,
             "authorName": c.channel_title,
@@ -236,7 +238,7 @@ class TrendingShortsView(APIView):
     def get(self, request):
         qs = PlaceDaenggle.objects.select_related("place")
         all_items = [
-            {
+            {   "id": row.id,
                 "video_id": row.video_id,
                 "placeTitle": row.place.title,
                 "playbackUrl": f"https://www.youtube.com/watch?v={row.video_id}",
@@ -315,6 +317,7 @@ class RegionShortsView(APIView):
         scrap_count_map, user_scrapped_set = _scrap_maps_for_clips(request.user, clip_pk_list)
 
         data_items = [{
+            "id": c.id,
             "video_id": c.video_id,
             "title": c.title,
             "authorName": c.channel_title,
@@ -377,6 +380,7 @@ class ConceptShortsView(APIView):
             scrap_count_map, user_scrapped_set = _scrap_maps_for_clips(request.user, clip_pk_list)
 
             items = [{
+                "id": c.id,
                 "videoId": c.video_id,
                 "title": c.title,
                 "channelTitle": c.channel_title,
@@ -458,6 +462,7 @@ class ShortsSearchView(APIView):
         scrap_count_map, user_scrapped_set = _scrap_maps_for_clips(request.user, clip_pk_list)
 
         data_items = [{
+            "id": c.id,
             "video_id": c.video_id,
             "title": c.title,
             "authorName": c.channel_title,
@@ -487,14 +492,14 @@ class PlaceDaenggleRecommendView(APIView):
                 {"detail": "장소를 찾을 수 없습니다."},
                 status=status.HTTP_404_NOT_FOUND,
             )
+        qs = PlaceDaenggle.objects.filter(place=place).order_by("id")
 
-        videos = PlaceDaenggle.objects.filter(place=place).values_list("video_id", flat=True)
         items = [
-            {
-                "video_id": vid,
-                "playbackUrl": f"https://www.youtube.com/watch?v={vid}",
+            {   "id": pd.id,
+                "video_id": pd.video_id,
+                "playbackUrl": f"https://www.youtube.com/watch?v={pd.video_id}",
             }
-            for vid in videos
+            for pd in qs
         ]
 
         response_data = {
@@ -558,6 +563,7 @@ class PlaceDaenggleMapAllView(APIView):
         )
 
         items = [{
+            "id": p.id,
             "video_id": p.video_id,
             "playbackUrl": f"https://www.youtube.com/watch?v={p.video_id}",
             "placeTitle": p.title,
@@ -584,7 +590,7 @@ class PlaceDaenggleFlatListView(APIView):
         )
 
         items = [
-            {"video_id": row.video_id, "placeTitle": row.place.title}
+            {"id": row.id,"video_id": row.video_id, "placeTitle": row.place.title}
             for row in qs
         ]
 
