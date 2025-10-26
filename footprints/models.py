@@ -2,6 +2,13 @@ from django.conf import settings
 from django.db import models
 from places.models import Place
 
+RATING_CHOICES = [
+    (5, "★★★★★"),
+    (4, "★★★★☆"),
+    (3, "★★★☆☆"),
+    (2, "★★☆☆☆"),
+    (1, "★☆☆☆☆"),
+]
 
 class EntryStatus(models.TextChoices):
     ALLOW = "allow",  "동반 출입 가능"
@@ -25,6 +32,7 @@ class Footprint(models.Model):
     conditions = models.JSONField(default=list, blank=True)
 
     welcome = models.PositiveSmallIntegerField(choices=WELCOME_CHOICES)
+    rating = models.PositiveSmallIntegerField(choices=RATING_CHOICES, default=5)
 
     body = models.TextField()
     created_at = models.DateTimeField(auto_now_add=True)

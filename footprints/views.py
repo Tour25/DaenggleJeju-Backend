@@ -36,11 +36,17 @@ ENTRY_LABELS = {
 }
 
 
-def _entry_chip(fp: Footprint) -> Optional[str]:
+def _entry_chip(fp):
     if fp.entry_status == "detail":
-        return (fp.entry_status_detail or "").strip() or None
-    return ENTRY_LABELS.get(fp.entry_status)
 
+        detail = (
+            getattr(fp, "entry_detail", None)
+            or getattr(fp, "entry_status_detail", None)
+            or ""
+        )
+        detail = detail.strip()
+        return detail or None
+    return ENTRY_LABELS.get(fp.entry_status)
 
 def _conditions_chip(fp: Footprint) -> Optional[str]:
     if not fp.conditions:
@@ -51,6 +57,27 @@ def _conditions_chip(fp: Footprint) -> Optional[str]:
 
 def _welcome_chip(fp: Footprint) -> Optional[str]:
     return WELCOME_LABELS.get(fp.welcome)
+
+def _pet_profile_of(user):
+
+    try:
+        dogs = getattr(user, "dogs", None)
+        dog = dogs.first() if hasattr(dogs, "first") else None
+        if not dog:
+            return None
+
+        size_label = dog.get_size_code_display() if hasattr(dog, "get_size_code_display") else None
+        breed_name = getattr(getattr(dog, "breed", None), "name_ko", None)
+
+        return {
+            "name": getattr(dog, "name", None),
+            "breedNameKo": breed_name,
+            "sizeLabelKo": size_label,
+            "ageYears": getattr(dog, "age_years", None),
+        }
+    except Exception:
+        return None
+
 
 class FootprintCreateView(APIView):
 
@@ -95,10 +122,11 @@ class FootprintCreateView(APIView):
         fp, created = Footprint.objects.update_or_create(
             user=request.user, place=place,
             defaults={
+                "rating": int(d["rating"]),
+                "welcome": int(d["welcome"]),
                 "entry_status": d["entryStatus"],
                 "entry_detail": d.get("entryStatusDetail", ""),
                 "conditions":   d.get("conditions", []),
-                "welcome":      int(d["welcome"]),
                 "body":         d["body"],
             },
         )
@@ -172,12 +200,13 @@ class MyFootprintsListView(APIView):
                     "name": CONTENT_TYPE_LABELS.get(p.content_type_id, "기타"),
                 },
                 "title": p.title,
+                "pet": _pet_profile_of(request.user),
                 "metaLine": f"{address_brief(p.addr1)} · {place_type_label(p) or ''}".rstrip(" ·"),
                 "createdAtText": created_text,
                 "distanceText": dist_text,
                 "thumbnail": thumb_or_text(p),
                 "chips": chips,
-                "welcome": fp.welcome,
+                "rating": fp.rating,
                 "body": fp.body,
             }
             items.append(prune_empty(item))
@@ -234,10 +263,11 @@ class PlaceFootprintsListView(APIView):
                 "writer": prune_empty({
                     "userId": fp.user_id,
                     "handle": getattr(fp.user, "handle", None),
+                    "pet": _pet_profile_of(fp.user),
                 }),
                 "createdAtText": created_text,
                 "chips": chips,
-                "welcome": fp.welcome,
+                "rating": fp.rating,
                 "body": fp.body,
                 "isMine": (uid == fp.user_id),
             }
