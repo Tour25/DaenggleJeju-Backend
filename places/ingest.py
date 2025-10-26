@@ -4,6 +4,7 @@ import json
 from .models import Place, PlaceImage, PetPolicy
 from .extra_data import HARDCODED
 
+
 def ingest_hardcoded(*, dry_run: bool = False, allow_data_urls: bool = True) -> dict:
 
     data = HARDCODED or {}
@@ -17,10 +18,35 @@ def ingest_hardcoded(*, dry_run: bool = False, allow_data_urls: bool = True) -> 
         "logs": [],
     }
 
+    def _to_list(x):
+        if not x:
+            return []
+        if isinstance(x, str):
+
+            try:
+                v = json.loads(x)
+                if isinstance(v, list):
+                    return [str(s).strip() for s in v if str(s).strip()]
+            except Exception:
+                pass
+            import re
+            return [s.strip() for s in re.split(r"[,\\n]+", x) if s.strip()]
+        if isinstance(x, (list, tuple)):
+            return [str(s).strip() for s in x if str(s).strip()]
+        return []
+
+    def _merge_unique(a, b):
+
+        return sorted(
+            {s for s in (a or []) if isinstance(s, str)} |
+            {s for s in (b or []) if isinstance(s, str)}
+        )
+
     @transaction.atomic
     def _run():
         for content_id, payload in data.items():
             stats["processed"] += 1
+
             place = (
                 Place.objects.filter(content_id=content_id).first()
                 or Place.objects.filter(content_id=str(content_id)).first()
@@ -30,9 +56,19 @@ def ingest_hardcoded(*, dry_run: bool = False, allow_data_urls: bool = True) -> 
                 stats["logs"].append(f"[SKIP] Place 없음: content_id={content_id}")
                 continue
 
-            chips = (payload or {}).get("chips") or []
-            if chips:
+
+            chips1_in = _to_list((payload or {}).get("chips1"))
+            chips2_in = _to_list((payload or {}).get("chips2"))
+            legacy = _to_list((payload or {}).get("chips"))
+
+
+            if legacy and not chips1_in:
+                chips1_in = legacy
+
+            if chips1_in or chips2_in:
                 policy, _ = PetPolicy.objects.get_or_create(place=place)
+
+
                 info = {}
                 if policy.etc_info:
                     try:
@@ -40,14 +76,30 @@ def ingest_hardcoded(*, dry_run: bool = False, allow_data_urls: bool = True) -> 
                         info = parsed if isinstance(parsed, dict) else {"_raw": str(policy.etc_info)}
                     except Exception:
                         info = {"_raw": str(policy.etc_info)}
-                before = [c for c in (info.get("chips") or []) if isinstance(c, str)]
-                merged = sorted(set(before + [c for c in chips if isinstance(c, str)]))
-                info["chips"] = merged
+
+                before1 = _to_list(info.get("chips1"))
+                before2 = _to_list(info.get("chips2"))
+
+                merged1 = _merge_unique(before1, chips1_in)
+                merged2 = _merge_unique(before2, chips2_in)
+
+                if isinstance(info.get("chips"), list):
+                    migrated = _merge_unique(merged1, _to_list(info.get("chips")))
+                    merged1 = migrated
+                    info.pop("chips", None)
+
+                info["chips1"] = merged1
+                info["chips2"] = merged2
+
                 if not dry_run:
                     policy.etc_info = json.dumps(info, ensure_ascii=False)
                     policy.save(update_fields=["etc_info"])
+
                 stats["updated_policies"] += 1
-                stats["logs"].append(f"[OK] chips 병합: {content_id} -> {merged}")
+                stats["logs"].append(
+                    f"[OK] chips1/2 병합: {content_id} -> chips1={merged1} | chips2={merged2}"
+                )
+
 
             if "images" in (payload or {}):
                 raw_list = (payload or {}).get("images") or []
@@ -70,7 +122,9 @@ def ingest_hardcoded(*, dry_run: bool = False, allow_data_urls: bool = True) -> 
                 if dry_run:
                     stats["removed_images"] += to_remove
                     stats["replaced_images"] += len(new_urls)
-                    stats["logs"].append(f"[DRY] 이미지 교체: {content_id} 삭제 {to_remove} → 추가 {len(new_urls)}")
+                    stats["logs"].append(
+                        f"[DRY] 이미지 교체: {content_id} 삭제 {to_remove} → 추가 {len(new_urls)}"
+                    )
                 else:
                     removed = qs.delete()[0]
                     stats["removed_images"] += removed
@@ -82,7 +136,9 @@ def ingest_hardcoded(*, dry_run: bool = False, allow_data_urls: bool = True) -> 
                     if place.has_image != new_has:
                         place.has_image = new_has
                         place.save(update_fields=["has_image"])
-                    stats["logs"].append(f"[OK] 이미지 교체: {content_id} 삭제 {removed} → 추가 {len(objs)}")
+                    stats["logs"].append(
+                        f"[OK] 이미지 교체: {content_id} 삭제 {removed} → 추가 {len(objs)}"
+                    )
 
     _run()
     return stats
