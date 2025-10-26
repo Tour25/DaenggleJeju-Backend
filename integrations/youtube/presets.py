@@ -28,7 +28,7 @@ PLACE_PRESETS = [
     {
         "context_id": "PLACE_andeok",
         "context_name": "안덕/대정",
-        "keywords": ["안덕 애견동반 여행", "대정 반려견 여행", "안덕 강아지 여행", "대정 카페 반려견"]
+        "keywords": ["제주 안덕 반려견 여행", "대정 반려견 여행", "안덕 강아지 여행", "대정 카페 반려견"]
     },
     {
         "context_id": "PLACE_seongsan",
