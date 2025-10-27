@@ -1,6 +1,6 @@
 PLACE_DAENGGLE_VIDEOS = {
     3112043: ["Nqn1yQrUYsU", "ldiR0VOwyAk"],  # 도치돌목장
-    3112140: [],  # 제주정원집 (영상 없음)
+    3112140: ["xiYk7CwtFWQ"],  # 제주정원집
     3112141: ["-tfw1IcIY6I", "wl1UpEa6NFo"],  # 야크마을
     2621853: ["kfl2u8UOacc", "SHRRO97ucxY"],  # 돈내코힐 리조트
     2032460: ["kTXUK8hr5tw", "1HeuUFDL2mo"],  # 황우지해안
