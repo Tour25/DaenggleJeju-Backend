@@ -15,6 +15,7 @@ from .models import Place, PlaceImage
 from .serializers import (
     PlaceMapAllQuery, PlaceDetailQuery, PlaceListQuery, PlaceSearchQuery
 )
+from daenggle.models import PlaceDaenggle
 from .constants import CONTENT_TYPE_LABELS, SIZE_KEYWORDS, AREA_KEYWORDS, AMENITY_KEYWORDS
 from .utils import (
     parse_bbox, text_or_unknown, parking_text,
@@ -60,6 +61,20 @@ def _scrap_counts_for_places(places) -> dict[int, int]:
 def _scrap_count_for_place(place: Place) -> int:
     ct = ContentType.objects.get_for_model(Place)
     return Scrap.objects.filter(content_type=ct, object_id=place.pk).count()
+
+def _daenggle_counts_for_places(places) -> dict[int, int]:
+
+    pks = [p.pk for p in places]
+    if not pks:
+        return {}
+    rows = (
+        PlaceDaenggle.objects
+        .filter(place_id__in=pks)
+        .values("place_id")
+        .annotate(c=Count("id"))
+    )
+    return {r["place_id"]: r["c"] for r in rows}
+
 
 def _extract_policy_chips(policy):
     chips = getattr(policy, "chips", None)
@@ -136,6 +151,7 @@ class PlaceMapAllView(APIView):
         rows = list(base)
         scraped_set = _scrapped_pk_set(request.user, rows)
         scrap_counts = _scrap_counts_for_places(rows)
+        daenggle_counts = _daenggle_counts_for_places(rows)
 
         user_lat = q.get("userLat")
         user_lng = q.get("userLng")
@@ -184,6 +200,7 @@ class PlaceMapAllView(APIView):
                 "chips2": chips2,
                 "isScrapped": (p.pk in scraped_set),
                 "scrapCount": scrap_counts.get(p.pk, 0),
+                "daenggleCount": daenggle_counts.get(p.pk, 0),
             })
 
         request._resp_message = "지도용 장소 목록 조회"
@@ -221,6 +238,7 @@ class PlaceListView(APIView):
         rows = list(qs)
         scraped_set = _scrapped_pk_set(request.user, rows)
         scrap_counts = _scrap_counts_for_places(rows)
+        daenggle_counts = _daenggle_counts_for_places(rows)
 
         user_lat = q.get("userLat")
         user_lng = q.get("userLng")
@@ -264,6 +282,7 @@ class PlaceListView(APIView):
                 "chips2": chips2,
                 "isScrapped": (p.pk in scraped_set),
                 "scrapCount": scrap_counts.get(p.pk, 0),
+                "daenggleCount": daenggle_counts.get(p.pk, 0),
             })
 
         request._resp_message = "장소 목록 조회"
@@ -305,6 +324,7 @@ class PlaceDetailView(APIView):
             "thumbnail": thumb_or_text(p),
             "isScrapped": _scrapped_bool(request.user, p),
             "scrapCount": _scrap_count_for_place(p),
+            "daenggleCount": PlaceDaenggle.objects.filter(place=p).count(),
         }
         if dist_km is not None:
             data["distanceText"] = f"{dist_km}km"
@@ -418,6 +438,7 @@ class PlaceSearchView(APIView):
         rows = list(qs)
         scraped_set = _scrapped_pk_set(request.user, rows)
         scrap_counts = _scrap_counts_for_places(rows)
+        daenggle_counts = _daenggle_counts_for_places(rows)
 
         user_lat = q.get("userLat")
         user_lng = q.get("userLng")
@@ -461,6 +482,7 @@ class PlaceSearchView(APIView):
                 "chips2": chips2,
                 "isScrapped": (p.pk in scraped_set),
                 "scrapCount": scrap_counts,
+                "daenggleCount": daenggle_counts.get(p.pk, 0),
             }
             items.append(prune_empty(item))
 
